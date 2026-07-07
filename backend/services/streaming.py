@@ -51,38 +51,38 @@ def register_crew_handlers(event_queue: q.Queue) -> list[tuple]:
     def on_tool_started(_source, event: ToolUsageStartedEvent) -> None:
         args = event.tool_args
         query = str(args.get("query", args.get("q", args))) if isinstance(args, dict) else str(args)
-        _push(_get_role(event), "tool_started", f"🔍 Searching for: {query[:120]}")
+        _push(_get_role(event), "tool_started", f"Searching for: {query[:120]}")
 
     def on_tool_finished(_source, event: ToolUsageFinishedEvent) -> None:
         output_len = len(str(event.output)) if event.output else 0
-        _push(_get_role(event), "tool_finished", f"✅ Search completed ({output_len} chars)")
+        _push(_get_role(event), "tool_finished", f"Search completed ({output_len} chars)")
 
     def on_reasoning_started(_source, event: AgentReasoningStartedEvent) -> None:
         _push(
             event.agent_role,
             "reasoning_started",
-            f"💭 {event.agent_role} is analyzing (attempt {event.attempt})...",
+            f"{event.agent_role} is analyzing (attempt {event.attempt})...",
         )
 
     def on_reasoning_completed(_source, event: AgentReasoningCompletedEvent) -> None:
         status = "ready" if event.ready else "needs revision"
-        _push(event.agent_role, "reasoning_completed", f"✅ {event.agent_role} analysis {status}")
+        _push(event.agent_role, "reasoning_completed", f"{event.agent_role} analysis {status}")
 
     def on_task_started(_source, event: TaskStartedEvent) -> None:
         task_desc = getattr(event.task, "description", "") if event.task else ""
         desc_short = (task_desc[:100] + "...") if len(task_desc) > 100 else task_desc
-        _push("System", "task_started", f"📋 Task: {desc_short or 'Unknown task'}")
+        _push("System", "task_started", f"Task: {desc_short or 'Unknown task'}")
 
     def on_task_completed(_source, event: TaskCompletedEvent) -> None:
         role = getattr(event.task, "agent", None)
         agent_name = getattr(role, "role", "System") if role else "System"
-        _push(agent_name, "task_completed", f"✅ {agent_name} task finished")
+        _push(agent_name, "task_completed", f"{agent_name} task finished")
 
     def on_agent_started(_source, event: AgentExecutionStartedEvent) -> None:
-        _push(event.agent.role, "execution_started", f"🧠 {event.agent.role} is working...")
+        _push(event.agent.role, "execution_started", f"{event.agent.role} is working...")
 
     def on_agent_completed(_source, event: AgentExecutionCompletedEvent) -> None:
-        _push(event.agent.role, "execution_completed", f"✅ {event.agent.role} completed")
+        _push(event.agent.role, "execution_completed", f"{event.agent.role} completed")
 
     registrations = [
         (ToolUsageStartedEvent, on_tool_started),

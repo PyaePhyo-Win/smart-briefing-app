@@ -1,5 +1,6 @@
 "use client";
 import { useState, useCallback } from "react";
+import { Check, ClipboardCopy, FileText } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { AppStatus } from "@/lib/types";
@@ -33,12 +34,12 @@ export function ReportPanel({ report, status, isRunning }: Props) {
           >
             {copied ? (
               <>
-                <span>✓</span>
+                <Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>Copied!</span>
               </>
             ) : (
               <>
-                <span>⎘</span>
+                <ClipboardCopy className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>Copy Markdown</span>
               </>
             )}
@@ -48,7 +49,10 @@ export function ReportPanel({ report, status, isRunning }: Props) {
       <div className="bg-gray-800/60 rounded-xl border border-gray-700/80 h-[580px] overflow-y-auto p-6">
         {!report && !isRunning && (
           <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
-            <div className="text-4xl opacity-20">📄</div>
+            <FileText
+              className="h-10 w-10 shrink-0 text-gray-700 opacity-60"
+              aria-hidden="true"
+            />
             <p className="text-gray-600 text-sm">
               Report will appear here after research completes
             </p>

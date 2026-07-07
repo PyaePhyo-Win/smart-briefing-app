@@ -1,3 +1,4 @@
+import { Check, LoaderCircle, X } from "lucide-react";
 import type { AppStatus } from "@/lib/types";
 import { STATUS_LABELS } from "@/lib/types";
 
@@ -26,28 +27,17 @@ export function StatusBar({ status }: Props) {
       }`}
     >
       {isActive && (
-        <svg
-          className="animate-spin h-3.5 w-3.5 text-violet-400 shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-          />
-        </svg>
+        <LoaderCircle
+          className="h-3.5 w-3.5 animate-spin shrink-0 text-violet-400"
+          aria-hidden="true"
+        />
       )}
-      {isDone && <span className="text-emerald-400">✓</span>}
-      {isError && <span className="text-red-400">✕</span>}
+      {isDone && (
+        <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
+      )}
+      {isError && (
+        <X className="h-3.5 w-3.5 shrink-0 text-red-400" aria-hidden="true" />
+      )}
       <span>{STATUS_LABELS[status]}</span>
     </div>
   );

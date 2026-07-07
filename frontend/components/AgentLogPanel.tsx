@@ -19,6 +19,23 @@ const EVENT_COLORS: Record<string, string> = {
   status: "text-gray-400",
 };
 
+const padTimePart = (value: number) => value.toString().padStart(2, "0");
+
+const formatLocalTime = (timestamp: string) => {
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) return "--";
+
+  const hours = date.getHours();
+  const period = hours >= 12 ? "PM" : "AM";
+  const displayHour = hours % 12 || 12;
+  const time = [displayHour, date.getMinutes(), date.getSeconds()]
+    .map(padTimePart)
+    .join(":");
+
+  return `${time} ${period}`;
+};
+
 export function AgentLogPanel({ entries, isRunning }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -57,10 +74,13 @@ export function AgentLogPanel({ entries, isRunning }: Props) {
         )}
         {entries.map((entry) => (
           <div key={entry.id} className="leading-relaxed group">
-            <span className="text-gray-700 select-none">
-              {entry.timestamp.slice(11, 19)}
-            </span>
-            <span className="text-gray-700 mx-2 select-none">│</span>
+            <time
+              className="text-gray-700 select-none"
+              dateTime={entry.timestamp}
+            >
+              {formatLocalTime(entry.timestamp)}
+            </time>
+            <span className="mx-2 h-3 border-l border-gray-800 align-middle" aria-hidden="true" />
             <span
               className={`font-medium ${
                 entry.agent === "System" ? "text-cyan-500" : "text-gray-500"
@@ -74,8 +94,8 @@ export function AgentLogPanel({ entries, isRunning }: Props) {
           </div>
         ))}
         {isRunning && (
-          <div className="flex items-center gap-1 pt-0.5">
-            <span className="text-gray-700 select-none">——</span>
+          <div className="flex items-center gap-1 pt-0.5" aria-hidden="true">
+            <span className="h-px w-4 bg-gray-800" />
             <span className="inline-block w-1.5 h-3.5 bg-violet-400 animate-pulse rounded-sm" />
           </div>
         )}

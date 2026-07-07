@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertTriangle, Sparkles } from "lucide-react";
 import { useResearchStream } from "@/hooks/useResearchStream";
 import { ResearchForm } from "@/components/ResearchForm";
 import { StatusBar } from "@/components/StatusBar";
@@ -18,7 +19,7 @@ export default function Home() {
         <header className="mb-10">
           <div className="flex items-center gap-3 mb-1">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-700 flex items-center justify-center text-sm shadow-lg shadow-violet-900/40">
-              ✦
+              <Sparkles className="h-4 w-4 shrink-0 text-white" aria-hidden="true" />
             </div>
             <h1 className="text-2xl font-bold text-white tracking-tight">
               Smart Briefing
@@ -43,7 +44,10 @@ export default function Home() {
         {/* Error Banner */}
         {errorMessage && (
           <div className="mb-6 p-4 rounded-xl bg-red-950/40 border border-red-800/50 text-red-300 text-sm flex items-start gap-2.5">
-            <span className="text-red-400 shrink-0 mt-0.5">⚠</span>
+            <AlertTriangle
+              className="h-4 w-4 shrink-0 mt-0.5 text-red-400"
+              aria-hidden="true"
+            />
             <span>{errorMessage}</span>
           </div>
         )}

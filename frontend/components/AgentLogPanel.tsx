@@ -44,8 +44,8 @@ export function AgentLogPanel({ entries, isRunning }: Props) {
   }, [entries]);
 
   return (
-    <section className="flex flex-col rounded-3xl border border-line bg-surface p-5 shadow-soft">
-      <div className="mb-5 flex items-center gap-3 border-b border-line pb-4">
+    <section className="flex h-full min-h-0 flex-col rounded-3xl border border-line bg-surface p-5 shadow-soft">
+      <div className="mb-5 flex items-start justify-between gap-4">
         <div className="flex gap-1.5" aria-hidden="true">
           <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
           <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
@@ -61,7 +61,7 @@ export function AgentLogPanel({ entries, isRunning }: Props) {
           </span>
         )}
       </div>
-      <div className="h-[580px] overflow-y-auto rounded-2xl border border-line bg-paper/45 p-5 font-mono text-xs leading-6">
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-line bg-paper/45 p-5 font-mono text-xs leading-6">
         {entries.length === 0 && !isRunning && (
           <p className="select-none text-muted/75 italic">
             Submit a topic to begin...

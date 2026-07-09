@@ -18,25 +18,25 @@ export function StatusBar({ status }: Props) {
 
   return (
     <div
-      className={`flex items-center gap-2.5 mb-6 text-sm px-4 py-2.5 rounded-lg border ${
+      className={`mb-8 flex items-center gap-3 rounded-2xl border bg-surface px-5 py-3 text-sm leading-6 shadow-soft ${
         isError
-          ? "bg-red-950/40 border-red-800/50 text-red-400"
+          ? "border-red-200 text-red-700 dark:border-red-900/60 dark:text-red-300"
           : isDone
-            ? "bg-emerald-950/40 border-emerald-800/50 text-emerald-400"
-            : "bg-gray-800/60 border-gray-700/50 text-gray-400"
+            ? "border-emerald-200 text-emerald-700 dark:border-emerald-900/60 dark:text-emerald-300"
+            : "border-line text-muted"
       }`}
     >
       {isActive && (
         <LoaderCircle
-          className="h-3.5 w-3.5 animate-spin shrink-0 text-violet-400"
+          className="h-4 w-4 shrink-0 animate-spin text-rust"
           aria-hidden="true"
         />
       )}
       {isDone && (
-        <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
+        <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-300" aria-hidden="true" />
       )}
       {isError && (
-        <X className="h-3.5 w-3.5 shrink-0 text-red-400" aria-hidden="true" />
+        <X className="h-4 w-4 shrink-0 text-red-600 dark:text-red-300" aria-hidden="true" />
       )}
       <span>{STATUS_LABELS[status]}</span>
     </div>

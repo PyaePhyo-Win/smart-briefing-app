@@ -3,24 +3,67 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: light;
+  --background: #F4F3EE;
+  --foreground: #2F2A25;
+  --color-paper: #F4F3EE;
+  --color-surface: #FFFFFF;
+  --color-rust: #C15F3C;
+  --color-ink: #2F2A25;
+  --color-muted: #6F6A60;
+  --color-line: #E5E5E1;
+  --color-line-strong: #B1ADA1;
+  --shadow-soft: 0 1px 2px rgba(47, 42, 37, 0.04);
   --font-inter: 'Inter', system-ui, sans-serif;
+  --font-lora: 'Lora', Georgia, serif;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #171512;
+  --foreground: #F4F3EE;
+  --color-paper: #171512;
+  --color-surface: #211E1A;
+  --color-rust: #D47854;
+  --color-ink: #F4F3EE;
+  --color-muted: #C8C2B7;
+  --color-line: #39342D;
+  --color-line-strong: #5A5248;
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+html {
+  background: var(--background);
 }
 
 body {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
   font-family: var(--font-inter);
 }
 
-/* Smooth scrollbar for log panels */
+h1,
+h2,
+h3 {
+  font-family: var(--font-lora);
+}
+
+::selection {
+  background: rgba(193, 95, 60, 0.18);
+}
+
+/* Smooth, subtle scrollbar for log and report panels */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #374151;
-  border-radius: 3px;
+  background: var(--color-line-strong);
+  border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #4b5563;
+  background: var(--color-muted);
 }

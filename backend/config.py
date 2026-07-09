@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     serper_api_key: str = ""
     crew_llm: str = "gemini/gemini-2.5-flash"
     polish_model: str = "gemini-2.5-flash"
+    chat_model: str = "gemini-2.5-flash"
     allowed_origins: str = "http://localhost:3000"
     max_crew_workers: int = 4
     log_level: str = "INFO"

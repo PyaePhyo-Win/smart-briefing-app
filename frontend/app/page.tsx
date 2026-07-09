@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -17,69 +18,230 @@ import {
   X,
 } from "lucide-react";
 import { useResearchStream } from "@/hooks/useResearchStream";
-import { ResearchForm } from "@/components/ResearchForm";
+import { useChatStream } from "@/hooks/useChatStream";
 import { StatusBar } from "@/components/StatusBar";
 import { AgentLogPanel } from "@/components/AgentLogPanel";
-import { ReportPanel } from "@/components/ReportPanel";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ConversationComposer } from "@/components/ConversationComposer";
+import { ConversationPanel } from "@/components/ConversationPanel";
+import type {
+  ChatHistoryMessage,
+  ConversationMessage,
+  ConversationMode,
+  PersistedConversation,
+} from "@/lib/types";
 
 const SIDEBAR_STORAGE_KEY = "smart-briefing-agent-sidebar-width";
-const DEFAULT_SIDEBAR_WIDTH = 400;
+const CONVERSATION_STORAGE_KEY = "smart-briefing-conversation";
 const MIN_SIDEBAR_WIDTH = 320;
 const MAX_SIDEBAR_WIDTH = 560;
+const DEFAULT_SIDEBAR_WIDTH = 400;
 
 const clampSidebarWidth = (width: number) =>
   Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width));
 
+const createId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+const updateMessage = (
+  messages: ConversationMessage[],
+  id: string,
+  updater: (message: ConversationMessage) => ConversationMessage
+) => messages.map((message) => (message.id === id ? updater(message) : message));
+
 export default function Home() {
-  const { status, logEntries, report, errorMessage, isRunning, submit, abort } =
+  const { status, logEntries, errorMessage, isRunning, submit, abort } =
     useResearchStream();
+  const { isChatRunning, chatErrorMessage, submitChat, abortChat } = useChatStream();
+  const [mode, setMode] = useState<ConversationMode>("research");
+  const [messages, setMessages] = useState<ConversationMessage[]>([]);
+  const [latestReport, setLatestReport] = useState("");
+  const [hasLoadedConversation, setHasLoadedConversation] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const isResizingRef = useRef(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const savedWidth = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
     if (!savedWidth) return;
 
-    const parsedWidth = Number(savedWidth);
+    const parsedWidth = Number.parseInt(savedWidth, 10);
     if (Number.isFinite(parsedWidth)) {
       setSidebarWidth(clampSidebarWidth(parsedWidth));
     }
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarWidth));
-  }, [sidebarWidth]);
+    const savedConversation = window.localStorage.getItem(CONVERSATION_STORAGE_KEY);
+    if (savedConversation) {
+      try {
+        const parsed = JSON.parse(savedConversation) as PersistedConversation;
+        setMessages(Array.isArray(parsed.messages) ? parsed.messages : []);
+        setLatestReport(typeof parsed.latestReport === "string" ? parsed.latestReport : "");
+      } catch {
+        window.localStorage.removeItem(CONVERSATION_STORAGE_KEY);
+      }
+    }
+    setHasLoadedConversation(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedConversation) return;
+    const payload: PersistedConversation = { messages, latestReport };
+    window.localStorage.setItem(CONVERSATION_STORAGE_KEY, JSON.stringify(payload));
+  }, [hasLoadedConversation, latestReport, messages]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages]);
+
+  const isAnyRunning = isRunning || isChatRunning;
+  const visibleError = errorMessage ?? chatErrorMessage;
+
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarCollapsed((current) => !current);
+  }, []);
 
   const startResizing = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
       event.preventDefault();
-      isResizingRef.current = true;
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
+      const startX = event.clientX;
+      const startWidth = sidebarWidth;
 
       const handlePointerMove = (moveEvent: globalThis.PointerEvent) => {
-        const nextWidth = window.innerWidth - moveEvent.clientX;
-        setSidebarWidth(clampSidebarWidth(nextWidth));
+        const delta = startX - moveEvent.clientX;
+        const nextWidth = clampSidebarWidth(startWidth + delta);
+        setSidebarWidth(nextWidth);
+        window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(nextWidth));
       };
 
-      const stopResizing = () => {
-        isResizingRef.current = false;
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
+      const handlePointerUp = () => {
         window.removeEventListener("pointermove", handlePointerMove);
-        window.removeEventListener("pointerup", stopResizing);
+        window.removeEventListener("pointerup", handlePointerUp);
       };
 
       window.addEventListener("pointermove", handlePointerMove);
-      window.addEventListener("pointerup", stopResizing, { once: true });
+      window.addEventListener("pointerup", handlePointerUp);
     },
-    []
+    [sidebarWidth]
   );
 
-  const toggleSidebar = () => setIsSidebarCollapsed((current) => !current);
+  const chatHistory = useMemo<ChatHistoryMessage[]>(
+    () =>
+      messages
+        .filter((message) => message.status !== "streaming" && message.content.trim())
+        .slice(-12)
+        .map((message) => ({ role: message.role, content: message.content })),
+    [messages]
+  );
+
+  const handleConversationSubmit = useCallback(
+    (nextMode: ConversationMode, value: string) => {
+      const userMessage: ConversationMessage = {
+        id: createId(),
+        role: "user",
+        content: value,
+        createdAt: new Date().toISOString(),
+        status: "done",
+        kind: nextMode,
+      };
+      const assistantId = createId();
+      const assistantMessage: ConversationMessage = {
+        id: assistantId,
+        role: "assistant",
+        content: "",
+        createdAt: new Date().toISOString(),
+        status: "streaming",
+        kind: nextMode,
+      };
+
+      if (nextMode === "research") {
+        setLatestReport("");
+        setMessages([userMessage, assistantMessage]);
+        let reportDraft = "";
+
+        void submit(value, {
+          onToken: (text) => {
+            reportDraft += text;
+            setMessages((current) =>
+              updateMessage(current, assistantId, (message) => ({
+                ...message,
+                content: message.content + text,
+              }))
+            );
+          },
+          onDone: () => {
+            setLatestReport(reportDraft);
+            setMessages((current) =>
+              updateMessage(current, assistantId, (message) => ({
+                ...message,
+                status: "done",
+              }))
+            );
+            setMode("chat");
+          },
+          onError: (message) => {
+            setMessages((current) =>
+              updateMessage(current, assistantId, (item) => ({
+                ...item,
+                content: item.content || message,
+                status: "error",
+              }))
+            );
+          },
+        });
+        return;
+      }
+
+      const nextMessages = [...messages, userMessage, assistantMessage];
+      setMessages(nextMessages);
+
+      void submitChat({
+        message: value,
+        history: chatHistory,
+        reportContext: latestReport,
+        onToken: (text) => {
+          setMessages((current) =>
+            updateMessage(current, assistantId, (message) => ({
+              ...message,
+              content: message.content + text,
+            }))
+          );
+        },
+        onDone: () => {
+          setMessages((current) =>
+            updateMessage(current, assistantId, (message) => ({
+              ...message,
+              status: "done",
+            }))
+          );
+        },
+        onError: (message) => {
+          setMessages((current) =>
+            updateMessage(current, assistantId, (item) => ({
+              ...item,
+              content: item.content || message,
+              status: "error",
+            }))
+          );
+        },
+      });
+    },
+    [chatHistory, latestReport, messages, submit, submitChat]
+  );
+
+  const handleAbort = useCallback(() => {
+    if (isRunning) abort();
+    if (isChatRunning) abortChat();
+    setMessages((current) =>
+      current.map((message) =>
+        message.status === "streaming" ? { ...message, status: "error" } : message
+      )
+    );
+  }, [abort, abortChat, isChatRunning, isRunning]);
 
   return (
     <main className="h-screen overflow-hidden bg-paper text-ink">
@@ -138,36 +300,40 @@ export default function Home() {
                     AI Research Briefing
                   </div>
                   <h2 className="font-serif text-3xl font-medium tracking-[-0.04em] text-ink sm:text-4xl">
-                    What should the research agents brief you on?
+                    Research with agents. Then chat with the report.
                   </h2>
                   <p className="mt-3 max-w-2xl text-sm leading-6 text-muted sm:text-base">
-                    Ask for a focused briefing and the report will stream here as an assistant response while the agent workspace tracks live activity.
+                    Start a fresh agent research thread, then switch to Chat to ask follow-up questions using the latest report as context.
                   </p>
                 </div>
 
                 <StatusBar status={status} />
 
-                {errorMessage && (
+                {visibleError && (
                   <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-surface px-5 py-4 text-sm leading-6 text-red-700 shadow-soft dark:border-red-900/60 dark:text-red-300">
                     <AlertTriangle
                       className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-300"
                       aria-hidden="true"
                     />
-                    <span>{errorMessage}</span>
+                    <span>{visibleError}</span>
                   </div>
                 )}
 
-                <ReportPanel report={report} status={status} isRunning={isRunning} />
+                <ConversationPanel messages={messages} isRunning={isAnyRunning} />
+                <div ref={scrollRef} />
               </div>
             </div>
 
             <div className="sticky bottom-0 shrink-0 border-t border-line bg-paper/95 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
               <div className="mx-auto max-w-4xl">
-                <ResearchForm
-                  onSubmit={submit}
-                  onAbort={abort}
-                  status={status}
-                  isRunning={isRunning}
+                <ConversationComposer
+                  mode={mode}
+                  onModeChange={setMode}
+                  onSubmit={handleConversationSubmit}
+                  onAbort={handleAbort}
+                  isRunning={isAnyRunning}
+                  isResearchRunning={isRunning}
+                  isChatRunning={isChatRunning}
                 />
               </div>
             </div>

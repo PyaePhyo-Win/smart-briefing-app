@@ -10,6 +10,31 @@ export type TokenEvent = { type: "token"; text: string };
 export type ErrorEvent = { type: "error"; message: string };
 export type DoneEvent = { type: "done" };
 export type SSEEvent = LogEvent | TokenEvent | ErrorEvent | DoneEvent;
+export type ChatSSEEvent = TokenEvent | ErrorEvent | DoneEvent;
+
+export type ConversationMode = "research" | "chat";
+export type ConversationRole = "user" | "assistant";
+export type ConversationMessageStatus = "streaming" | "done" | "error";
+export type ConversationMessageKind = "research" | "chat";
+
+export type ConversationMessage = {
+  id: string;
+  role: ConversationRole;
+  content: string;
+  createdAt: string;
+  status?: ConversationMessageStatus;
+  kind?: ConversationMessageKind;
+};
+
+export type PersistedConversation = {
+  messages: ConversationMessage[];
+  latestReport: string;
+};
+
+export type ChatHistoryMessage = {
+  role: ConversationRole;
+  content: string;
+};
 
 export type LogEntry = {
   id: number;

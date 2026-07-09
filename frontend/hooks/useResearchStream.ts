@@ -25,7 +25,14 @@ export function useResearchStream() {
   }, []);
 
   const submit = useCallback(
-    async (topic: string) => {
+    async (
+      topic: string,
+      callbacks?: {
+        onToken?: (text: string) => void;
+        onDone?: () => void;
+        onError?: (message: string) => void;
+      }
+    ) => {
       if (!topic.trim()) return;
       reset();
 
@@ -78,12 +85,15 @@ export function useResearchStream() {
                 } else if (parsed.type === "token") {
                   setStatus("polishing");
                   setReport((prev) => prev + parsed.text);
+                  callbacks?.onToken?.(parsed.text);
                 } else if (parsed.type === "error") {
                   setErrorMessage(parsed.message);
+                  callbacks?.onError?.(parsed.message);
                   setStatus("error");
                   return;
                 } else if (parsed.type === "done") {
                   setStatus("done");
+                  callbacks?.onDone?.();
                 }
               } catch {
                 // skip malformed lines
@@ -96,6 +106,8 @@ export function useResearchStream() {
         setErrorMessage(
           err instanceof Error ? err.message : "Failed to reach backend server."
         );
+        const message = err instanceof Error ? err.message : "Failed to reach backend server.";
+        callbacks?.onError?.(message);
         setStatus("error");
       }
     },

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 type Theme = "light" | "dark";
 
@@ -23,6 +24,7 @@ const applyTheme = (theme: Theme) => {
 };
 
 export function ThemeToggle() {
+  const { t } = useTranslation();
   const [theme, setTheme] = useState<Theme>("light");
   const [mounted, setMounted] = useState(false);
 
@@ -46,7 +48,9 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggleTheme}
-      aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
+      aria-label={t("theme.switchMode", {
+        mode: isDark ? t("theme.light") : t("theme.dark"),
+      })}
       aria-pressed={isDark}
       className="inline-flex h-11 items-center gap-2 rounded-full border border-line bg-surface px-3.5 text-sm font-medium text-muted shadow-soft transition duration-200 hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10"
     >
@@ -55,7 +59,7 @@ export function ThemeToggle() {
       ) : (
         <Moon className="h-4 w-4 shrink-0" aria-hidden="true" />
       )}
-      <span>{mounted && isDark ? "Light" : "Dark"}</span>
+      <span>{mounted && isDark ? t("theme.light") : t("theme.dark")}</span>
     </button>
   );
 }

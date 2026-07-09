@@ -1,12 +1,13 @@
 import { Check, LoaderCircle, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { AppStatus } from "@/lib/types";
-import { STATUS_LABELS } from "@/lib/types";
 
 interface Props {
   status: AppStatus;
 }
 
 export function StatusBar({ status }: Props) {
+  const { t } = useTranslation();
   const isActive =
     status === "connecting" ||
     status === "researching" ||
@@ -38,7 +39,7 @@ export function StatusBar({ status }: Props) {
       {isError && (
         <X className="h-4 w-4 shrink-0 text-red-600 dark:text-red-300" aria-hidden="true" />
       )}
-      <span>{STATUS_LABELS[status]}</span>
+      <span>{t(`status.${status}`)}</span>
     </div>
   );
 }

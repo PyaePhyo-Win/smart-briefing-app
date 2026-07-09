@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { Bot, FlaskConical, Send, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { ConversationMode } from "@/lib/types";
 
 interface Props {
@@ -14,15 +15,11 @@ interface Props {
   isChatRunning: boolean;
 }
 
-const MODE_CONFIG: Record<ConversationMode, { label: string; placeholder: string; maxLength: number }> = {
+const MODE_CONFIG: Record<ConversationMode, { maxLength: number }> = {
   research: {
-    label: "Research",
-    placeholder: "Ask the agents to research a topic...",
     maxLength: 300,
   },
   chat: {
-    label: "Chat",
-    placeholder: "Ask about the report or continue the conversation...",
     maxLength: 2000,
   },
 };
@@ -36,8 +33,14 @@ export function ConversationComposer({
   isResearchRunning,
   isChatRunning,
 }: Props) {
+  const { t } = useTranslation();
   const [value, setValue] = useState("");
   const activeConfig = MODE_CONFIG[mode];
+  const activeLabel = mode === "research" ? t("composer.research") : t("composer.chat");
+  const activePlaceholder =
+    mode === "research"
+      ? t("composer.researchPlaceholder")
+      : t("composer.chatPlaceholder");
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -48,10 +51,10 @@ export function ConversationComposer({
   };
 
   const actionLabel = isResearchRunning
-    ? "Researching"
+    ? t("composer.researching")
     : isChatRunning
-      ? "Chatting"
-      : activeConfig.label;
+      ? t("composer.chatting")
+      : activeLabel;
 
   return (
     <form onSubmit={handleSubmit}>
@@ -74,7 +77,7 @@ export function ConversationComposer({
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                {MODE_CONFIG[item].label}
+                {item === "research" ? t("composer.research") : t("composer.chat")}
               </button>
             );
           })}
@@ -82,13 +85,13 @@ export function ConversationComposer({
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <label htmlFor="conversation-message" className="sr-only">
-            {activeConfig.placeholder}
+            {activePlaceholder}
           </label>
           <textarea
             id="conversation-message"
             value={value}
             onChange={(event) => setValue(event.target.value)}
-            placeholder={activeConfig.placeholder}
+            placeholder={activePlaceholder}
             disabled={isRunning}
             maxLength={activeConfig.maxLength}
             rows={1}
@@ -102,7 +105,7 @@ export function ConversationComposer({
               className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-line-strong bg-surface px-6 py-4 text-sm font-semibold text-ink transition duration-200 hover:border-rust hover:text-rust disabled:opacity-60"
             >
               <X className="h-4 w-4" aria-hidden="true" />
-              Cancel
+              {t("composer.cancel")}
             </button>
           ) : (
             <button
@@ -119,7 +122,9 @@ export function ConversationComposer({
 
       {value.length > activeConfig.maxLength - 50 && (
         <p className="ml-3 mt-2 text-xs text-rust">
-          {activeConfig.maxLength - value.length} characters remaining
+          {t("composer.charactersRemaining", {
+            count: activeConfig.maxLength - value.length,
+          })}
         </p>
       )}
     </form>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Lora } from "next/font/google";
+import { I18nProvider } from "@/components/I18nProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -43,7 +44,7 @@ export default function RootLayout({
         className={`${inter.variable} ${lora.variable} font-sans bg-paper text-ink antialiased min-h-screen transition-colors duration-200`}
       >
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-        {children}
+        <I18nProvider>{children}</I18nProvider>
       </body>
     </html>
   );

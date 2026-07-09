@@ -17,10 +17,12 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useResearchStream } from "@/hooks/useResearchStream";
 import { useChatStream } from "@/hooks/useChatStream";
 import { StatusBar } from "@/components/StatusBar";
 import { AgentLogPanel } from "@/components/AgentLogPanel";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ConversationComposer } from "@/components/ConversationComposer";
 import { ConversationPanel } from "@/components/ConversationPanel";
@@ -52,6 +54,7 @@ const updateMessage = (
 ) => messages.map((message) => (message.id === id ? updater(message) : message));
 
 export default function Home() {
+  const { t } = useTranslation();
   const { status, logEntries, errorMessage, isRunning, submit, abort } =
     useResearchStream();
   const { isChatRunning, chatErrorMessage, submitChat, abortChat } = useChatStream();
@@ -253,7 +256,7 @@ export default function Home() {
                 type="button"
                 onClick={() => setIsMobileSidebarOpen(true)}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface text-muted transition hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10 lg:hidden"
-                aria-label="Open agent workspace"
+                aria-label={t("header.openWorkspace")}
               >
                 <Menu className="h-4 w-4" aria-hidden="true" />
               </button>
@@ -262,10 +265,10 @@ export default function Home() {
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted">
-                  Smart Briefing
+                  {t("app.title")}
                 </p>
                 <h1 className="truncate font-serif text-xl font-medium tracking-[-0.03em] text-ink">
-                  Research Chat
+                  {t("app.subtitle")}
                 </h1>
               </div>
             </div>
@@ -276,8 +279,8 @@ export default function Home() {
                 className="hidden h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-xs font-semibold text-muted transition hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10 lg:inline-flex"
                 aria-label={
                   isSidebarCollapsed
-                    ? "Expand agent workspace"
-                    : "Collapse agent workspace"
+                    ? t("header.expandWorkspace")
+                    : t("header.collapseWorkspace")
                 }
               >
                 {isSidebarCollapsed ? (
@@ -285,8 +288,13 @@ export default function Home() {
                 ) : (
                   <PanelRightClose className="h-4 w-4" aria-hidden="true" />
                 )}
-                <span>{isSidebarCollapsed ? "Open Workspace" : "Hide Workspace"}</span>
+                <span>
+                  {isSidebarCollapsed
+                    ? t("header.openWorkspaceShort")
+                    : t("header.hideWorkspaceShort")}
+                </span>
               </button>
+              <LanguageSwitcher />
               <ThemeToggle />
             </div>
           </header>
@@ -297,13 +305,13 @@ export default function Home() {
                 <div className="rounded-3xl border border-line bg-surface p-5 shadow-soft sm:p-7">
                   <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-rust/20 bg-rust/5 px-3 py-1.5 text-xs font-medium text-rust">
                     <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                    AI Research Briefing
+                    {t("app.badge")}
                   </div>
                   <h2 className="font-serif text-3xl font-medium tracking-[-0.04em] text-ink sm:text-4xl">
-                    Research with agents. Then chat with the report.
+                    {t("app.heroTitle")}
                   </h2>
                   <p className="mt-3 max-w-2xl text-sm leading-6 text-muted sm:text-base">
-                    Start a fresh agent research thread, then switch to Chat to ask follow-up questions using the latest report as context.
+                    {t("app.heroDescription")}
                   </p>
                 </div>
 
@@ -349,7 +357,7 @@ export default function Home() {
               type="button"
               onPointerDown={startResizing}
               className="absolute -left-3 top-1/2 z-10 flex h-16 w-6 -translate-y-1/2 cursor-col-resize items-center justify-center rounded-full border border-line bg-surface text-muted shadow-soft transition hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10"
-              aria-label="Resize agent workspace"
+              aria-label={t("header.resizeWorkspace")}
             >
               <GripVertical className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -366,18 +374,18 @@ export default function Home() {
             type="button"
             className="absolute inset-0 bg-ink/35"
             onClick={() => setIsMobileSidebarOpen(false)}
-            aria-label="Close agent workspace overlay"
+            aria-label={t("header.closeWorkspaceOverlay")}
           />
           <aside className="absolute right-0 top-0 flex h-full w-[min(92vw,420px)] flex-col border-l border-line bg-surface p-4 shadow-soft">
             <div className="mb-4 flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-                Agent Workspace
+                {t("header.workspaceTitle")}
               </p>
               <button
                 type="button"
                 onClick={() => setIsMobileSidebarOpen(false)}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface text-muted transition hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10"
-                aria-label="Close agent workspace"
+                aria-label={t("header.closeWorkspace")}
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>

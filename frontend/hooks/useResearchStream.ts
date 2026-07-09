@@ -1,10 +1,12 @@
 "use client";
 import { useState, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import type { LogEntry, AppStatus, SSEEvent } from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export function useResearchStream() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<AppStatus>("idle");
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [report, setReport] = useState("");
@@ -47,7 +49,9 @@ export function useResearchStream() {
           signal: controller.signal,
         });
 
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        if (!res.ok) {
+          throw new Error(t("errors.serverError", { status: res.status }));
+        }
 
         const reader = res.body!.getReader();
         const decoder = new TextDecoder();
@@ -104,14 +108,15 @@ export function useResearchStream() {
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setErrorMessage(
-          err instanceof Error ? err.message : "Failed to reach backend server."
+          err instanceof Error ? err.message : t("errors.backendUnreachable")
         );
-        const message = err instanceof Error ? err.message : "Failed to reach backend server.";
+        const message =
+          err instanceof Error ? err.message : t("errors.backendUnreachable");
         callbacks?.onError?.(message);
         setStatus("error");
       }
     },
-    [reset, addLog]
+    [reset, addLog, t]
   );
 
   const abort = useCallback(() => {

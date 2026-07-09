@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type { LogEntry } from "@/lib/types";
 
 interface Props {
@@ -37,6 +38,7 @@ const formatLocalTime = (timestamp: string) => {
 };
 
 export function AgentLogPanel({ entries, isRunning }: Props) {
+  const { t } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,24 +54,24 @@ export function AgentLogPanel({ entries, isRunning }: Props) {
           <span className="h-2.5 w-2.5 rounded-full bg-rust" />
         </div>
         <h2 className="font-serif text-xl font-medium tracking-[-0.02em] text-ink">
-          Agent Workspace
+          {t("workspace.title")}
         </h2>
         {isRunning && (
           <span className="ml-auto flex items-center gap-2 rounded-full border border-rust/20 bg-rust/5 px-3 py-1 text-xs font-medium text-rust">
             <span className="h-1.5 w-1.5 rounded-full bg-rust animate-pulse" />
-            Live
+            {t("workspace.live")}
           </span>
         )}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-line bg-paper/45 p-5 font-mono text-xs leading-6">
         {entries.length === 0 && !isRunning && (
           <p className="select-none text-muted/75 italic">
-            Submit a topic to begin...
+            {t("workspace.empty")}
           </p>
         )}
         {entries.length === 0 && isRunning && (
           <p className="animate-pulse text-muted/75">
-            Waiting for agent events...
+            {t("workspace.waiting")}
           </p>
         )}
         <div className="space-y-2">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { ChatHistoryMessage, ChatSSEEvent } from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -15,6 +16,7 @@ type SubmitChatArgs = {
 };
 
 export function useChatStream() {
+  const { t } = useTranslation();
   const [isChatRunning, setIsChatRunning] = useState(false);
   const [chatErrorMessage, setChatErrorMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -40,8 +42,10 @@ export function useChatStream() {
           signal: controller.signal,
         });
 
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
-        if (!res.body) throw new Error("Streaming response is empty.");
+        if (!res.ok) {
+          throw new Error(t("errors.serverError", { status: res.status }));
+        }
+        if (!res.body) throw new Error(t("errors.emptyStream"));
 
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -79,14 +83,15 @@ export function useChatStream() {
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
-        const messageText = err instanceof Error ? err.message : "Failed to reach backend server.";
+        const messageText =
+          err instanceof Error ? err.message : t("errors.backendUnreachable");
         setChatErrorMessage(messageText);
         onError(messageText);
       } finally {
         setIsChatRunning(false);
       }
     },
-    []
+    [t]
   );
 
   const abortChat = useCallback(() => {

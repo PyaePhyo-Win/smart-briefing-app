@@ -51,12 +51,3 @@ export type AppStatus =
   | "polishing"
   | "done"
   | "error";
-
-export const STATUS_LABELS: Record<AppStatus, string> = {
-  idle: "",
-  connecting: "Connecting to engine...",
-  researching: "Agent research in progress",
-  polishing: "Generating final report",
-  done: "Report Complete",
-  error: "Error",
-};

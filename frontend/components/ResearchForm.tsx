@@ -1,5 +1,6 @@
 "use client";
 import { useState, FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import type { AppStatus } from "@/lib/types";
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function ResearchForm({ onSubmit, onAbort, status, isRunning }: Props) {
+  const { t } = useTranslation();
   const [topic, setTopic] = useState("");
 
   const handleSubmit = (e: FormEvent) => {
@@ -19,25 +21,25 @@ export function ResearchForm({ onSubmit, onAbort, status, isRunning }: Props) {
 
   const buttonLabel =
     status === "connecting"
-      ? "Connecting..."
+      ? t("researchForm.connecting")
       : status === "researching"
-        ? "Researching..."
+        ? t("researchForm.researching")
         : status === "polishing"
-          ? "Polishing..."
-          : "Research";
+          ? t("researchForm.polishing")
+          : t("researchForm.submit");
 
   return (
     <form onSubmit={handleSubmit}>
       <div className="rounded-3xl border border-line bg-surface p-2 shadow-soft">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <label htmlFor="research-topic" className="sr-only">
-            Research topic
+            {t("researchForm.topic")}
           </label>
           <textarea
             id="research-topic"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            placeholder="Ask for a briefing..."
+            placeholder={t("researchForm.placeholder")}
             disabled={isRunning}
             maxLength={300}
             rows={1}
@@ -49,7 +51,7 @@ export function ResearchForm({ onSubmit, onAbort, status, isRunning }: Props) {
               onClick={onAbort}
               className="min-h-14 rounded-2xl border border-line-strong bg-surface px-6 py-4 text-sm font-semibold text-ink transition duration-200 hover:border-rust hover:text-rust disabled:opacity-60"
             >
-              Cancel
+              {t("researchForm.cancel")}
             </button>
           ) : (
             <button
@@ -64,7 +66,7 @@ export function ResearchForm({ onSubmit, onAbort, status, isRunning }: Props) {
       </div>
       {topic.length > 250 && (
         <p className="ml-3 mt-2 text-xs text-rust">
-          {300 - topic.length} characters remaining
+          {t("researchForm.charactersRemaining", { count: 300 - topic.length })}
         </p>
       )}
     </form>

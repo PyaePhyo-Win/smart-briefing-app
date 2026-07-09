@@ -3,6 +3,7 @@ import { useState, useCallback } from "react";
 import { Check, ClipboardCopy, FileText } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useTranslation } from "react-i18next";
 import type { AppStatus } from "@/lib/types";
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function ReportPanel({ report, status, isRunning }: Props) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
@@ -30,9 +32,9 @@ export function ReportPanel({ report, status, isRunning }: Props) {
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-rust">
-              Assistant
+              {t("report.assistant")}
             </p>
-            <h2 className="font-serif text-xl text-ink">Research briefing</h2>
+            <h2 className="font-serif text-xl text-ink">{t("report.title")}</h2>
           </div>
         </div>
         {report && status === "done" && (
@@ -46,7 +48,7 @@ export function ReportPanel({ report, status, isRunning }: Props) {
             ) : (
               <ClipboardCopy className="h-4 w-4" aria-hidden="true" />
             )}
-            {copied ? "Copied" : "Copy"}
+            {copied ? t("report.copied") : t("report.copy")}
           </button>
         )}
       </div>
@@ -58,16 +60,15 @@ export function ReportPanel({ report, status, isRunning }: Props) {
               <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full border border-line bg-surface text-rust">
                 <FileText className="h-6 w-6" aria-hidden="true" />
               </div>
-              <h3 className="font-serif text-2xl text-ink">Start a conversation</h3>
+              <h3 className="font-serif text-2xl text-ink">{t("report.emptyTitle")}</h3>
               <p className="mt-3 max-w-sm text-sm leading-6 text-muted">
-                Submit a research topic below and the assistant will stream the
-                briefing here as it works.
+                {t("report.emptyBody")}
               </p>
             </div>
           )}
 
           {isRunning && !report && (
-            <div className="space-y-5" aria-label="Generating report">
+            <div className="space-y-5" aria-label={t("report.generating")}>
               {[0, 1, 2].map((item) => (
                 <div key={item} className="space-y-3">
                   <div className="h-4 w-2/3 animate-pulse rounded-full bg-line" />

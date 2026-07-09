@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { Bot, Check, ClipboardCopy, FileText, FlaskConical, User } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useTranslation } from "react-i18next";
 import type { ConversationMessage } from "@/lib/types";
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function ConversationPanel({ messages, isRunning }: Props) {
+  const { t } = useTranslation();
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleCopy = useCallback(async (message: ConversationMessage) => {
@@ -28,9 +30,9 @@ export function ConversationPanel({ messages, isRunning }: Props) {
           <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full border border-line bg-surface text-rust">
             <FileText className="h-6 w-6" aria-hidden="true" />
           </div>
-          <h3 className="font-serif text-2xl text-ink">Start a conversation</h3>
+          <h3 className="font-serif text-2xl text-ink">{t("conversation.emptyTitle")}</h3>
           <p className="mt-3 max-w-md text-sm leading-6 text-muted">
-            Choose Research to start a fresh agent briefing, or Chat to ask the LLM a direct question. After research, Chat can use the latest report as context.
+            {t("conversation.emptyBody")}
           </p>
         </div>
       </section>
@@ -59,7 +61,11 @@ export function ConversationPanel({ messages, isRunning }: Props) {
             <div className={`min-w-0 ${isUser ? "max-w-[82%]" : "max-w-[92%] flex-1"}`}>
               <div className="mb-2 flex items-center justify-between gap-3 px-1">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-                  {isUser ? "You" : isResearch ? "Research Report" : "Assistant"}
+                  {isUser
+                    ? t("conversation.you")
+                    : isResearch
+                      ? t("conversation.researchReport")
+                      : t("conversation.assistant")}
                 </p>
                 {canCopy && (
                   <button
@@ -72,7 +78,7 @@ export function ConversationPanel({ messages, isRunning }: Props) {
                     ) : (
                       <ClipboardCopy className="h-3.5 w-3.5" aria-hidden="true" />
                     )}
-                    {copiedId === message.id ? "Copied" : "Copy"}
+                    {copiedId === message.id ? t("conversation.copied") : t("conversation.copy")}
                   </button>
                 )}
               </div>
@@ -98,7 +104,7 @@ export function ConversationPanel({ messages, isRunning }: Props) {
                     </div>
                   )
                 ) : (
-                  <div className="space-y-3" aria-label="Generating response">
+                  <div className="space-y-3" aria-label={t("conversation.generatingResponse")}>
                     {[0, 1, 2].map((item) => (
                       <div key={item} className="h-4 animate-pulse rounded-full bg-line" />
                     ))}

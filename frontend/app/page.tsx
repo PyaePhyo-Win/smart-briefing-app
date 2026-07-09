@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   GripVertical,
   Menu,
+  PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
   Sparkles,
@@ -26,6 +27,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ConversationComposer } from "@/components/ConversationComposer";
 import { ConversationPanel } from "@/components/ConversationPanel";
+import { ConversationHistorySidebar } from "@/components/ConversationHistorySidebar";
 import type {
   ChatHistoryMessage,
   ConversationMessage,
@@ -34,7 +36,8 @@ import type {
 } from "@/lib/types";
 
 const SIDEBAR_STORAGE_KEY = "smart-briefing-agent-sidebar-width";
-const CONVERSATION_STORAGE_KEY = "smart-briefing-conversation";
+const CONVERSATION_HISTORY_STORAGE_KEY = "smart-briefing-conversation-history";
+const LEGACY_CONVERSATION_STORAGE_KEY = "smart-briefing-conversation";
 const MIN_SIDEBAR_WIDTH = 320;
 const MAX_SIDEBAR_WIDTH = 560;
 const DEFAULT_SIDEBAR_WIDTH = 400;
@@ -53,19 +56,114 @@ const updateMessage = (
   updater: (message: ConversationMessage) => ConversationMessage
 ) => messages.map((message) => (message.id === id ? updater(message) : message));
 
+const createTimestamp = () => new Date().toISOString();
+
+const hasRealConversation = (messages: ConversationMessage[]) =>
+  messages.some((message) => message.role === "user" && message.content.trim().length > 0);
+
+const createConversationTitle = (messages: ConversationMessage[]) => {
+  const firstUserMessage = messages.find(
+    (message) => message.role === "user" && message.content.trim().length > 0
+  );
+  if (!firstUserMessage) return undefined;
+  const title = firstUserMessage.content.trim().replace(/\s+/g, " ");
+  return title.length > 80 ? `${title.slice(0, 77)}...` : title;
+};
+
+const sortConversationsByCreatedAt = (conversations: PersistedConversation[]) =>
+  [...conversations].sort(
+    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+  );
+
+const normalizePersistedConversation = (value: unknown): PersistedConversation | null => {
+  if (!value || typeof value !== "object") return null;
+
+  const conversation = value as Partial<PersistedConversation>;
+  if (
+    typeof conversation.id !== "string" ||
+    typeof conversation.createdAt !== "string" ||
+    !Array.isArray(conversation.messages)
+  ) {
+    return null;
+  }
+
+  return {
+    id: conversation.id,
+    createdAt: conversation.createdAt,
+    updatedAt: typeof conversation.updatedAt === "string" ? conversation.updatedAt : conversation.createdAt,
+    title: typeof conversation.title === "string" ? conversation.title : undefined,
+    messages: conversation.messages,
+    latestReport: typeof conversation.latestReport === "string" ? conversation.latestReport : "",
+  };
+};
+
 export default function Home() {
   const { t } = useTranslation();
   const { status, logEntries, errorMessage, isRunning, submit, abort } =
     useResearchStream();
   const { isChatRunning, chatErrorMessage, submitChat, abortChat } = useChatStream();
   const [mode, setMode] = useState<ConversationMode>("research");
+  const [activeConversationId, setActiveConversationId] = useState(createId);
+  const [activeConversationCreatedAt, setActiveConversationCreatedAt] = useState(createTimestamp);
+  const [conversationHistory, setConversationHistory] = useState<PersistedConversation[]>([]);
+  const [hasLoadedConversationHistory, setHasLoadedConversationHistory] = useState(false);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [latestReport, setLatestReport] = useState("");
-  const [hasLoadedConversation, setHasLoadedConversation] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isMobileHistoryOpen, setIsMobileHistoryOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const savedHistory = window.localStorage.getItem(CONVERSATION_HISTORY_STORAGE_KEY);
+    if (savedHistory) {
+      try {
+        const parsed = JSON.parse(savedHistory) as unknown;
+        const conversations = Array.isArray(parsed)
+          ? parsed
+              .map(normalizePersistedConversation)
+              .filter((conversation): conversation is PersistedConversation => Boolean(conversation))
+              .filter((conversation) => hasRealConversation(conversation.messages))
+          : [];
+        setConversationHistory(sortConversationsByCreatedAt(conversations));
+      } catch {
+        window.localStorage.removeItem(CONVERSATION_HISTORY_STORAGE_KEY);
+      }
+    }
+
+    window.localStorage.removeItem(LEGACY_CONVERSATION_STORAGE_KEY);
+    setHasLoadedConversationHistory(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedConversationHistory) return;
+
+    setConversationHistory((current) => {
+      const existing = current.find((conversation) => conversation.id === activeConversationId);
+      const remaining = current.filter((conversation) => conversation.id !== activeConversationId);
+
+      if (!hasRealConversation(messages)) {
+        const next = sortConversationsByCreatedAt(remaining);
+        window.localStorage.setItem(CONVERSATION_HISTORY_STORAGE_KEY, JSON.stringify(next));
+        return next;
+      }
+
+      const next = sortConversationsByCreatedAt([
+        ...remaining,
+        {
+          id: activeConversationId,
+          createdAt: existing?.createdAt ?? activeConversationCreatedAt,
+          updatedAt: createTimestamp(),
+          title: existing?.title ?? createConversationTitle(messages),
+          messages,
+          latestReport,
+        },
+      ]);
+      window.localStorage.setItem(CONVERSATION_HISTORY_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, [activeConversationCreatedAt, activeConversationId, hasLoadedConversationHistory, latestReport, messages]);
 
   useEffect(() => {
     const savedWidth = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
@@ -76,26 +174,6 @@ export default function Home() {
       setSidebarWidth(clampSidebarWidth(parsedWidth));
     }
   }, []);
-
-  useEffect(() => {
-    const savedConversation = window.localStorage.getItem(CONVERSATION_STORAGE_KEY);
-    if (savedConversation) {
-      try {
-        const parsed = JSON.parse(savedConversation) as PersistedConversation;
-        setMessages(Array.isArray(parsed.messages) ? parsed.messages : []);
-        setLatestReport(typeof parsed.latestReport === "string" ? parsed.latestReport : "");
-      } catch {
-        window.localStorage.removeItem(CONVERSATION_STORAGE_KEY);
-      }
-    }
-    setHasLoadedConversation(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hasLoadedConversation) return;
-    const payload: PersistedConversation = { messages, latestReport };
-    window.localStorage.setItem(CONVERSATION_STORAGE_KEY, JSON.stringify(payload));
-  }, [hasLoadedConversation, latestReport, messages]);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -246,12 +324,59 @@ export default function Home() {
     );
   }, [abort, abortChat, isChatRunning, isRunning]);
 
+  const handleNewConversation = useCallback(() => {
+    if (isRunning) abort();
+    if (isChatRunning) abortChat();
+
+    setActiveConversationId(createId());
+    setActiveConversationCreatedAt(createTimestamp());
+    setMode("research");
+    setMessages([]);
+    setLatestReport("");
+    setIsMobileHistoryOpen(false);
+  }, [abort, abortChat, isChatRunning, isRunning]);
+
+  const handleSelectConversation = useCallback(
+    (conversation: PersistedConversation) => {
+      if (isRunning) abort();
+      if (isChatRunning) abortChat();
+
+      setActiveConversationId(conversation.id);
+      setActiveConversationCreatedAt(conversation.createdAt);
+      setMessages(conversation.messages);
+      setLatestReport(conversation.latestReport);
+      setMode(
+        conversation.latestReport || conversation.messages.some((message) => message.kind === "chat")
+          ? "chat"
+          : "research"
+      );
+      setIsMobileHistoryOpen(false);
+    },
+    [abort, abortChat, isChatRunning, isRunning]
+  );
+
   return (
     <main className="h-screen overflow-hidden bg-paper text-ink">
       <div className="flex h-full min-h-0">
+        <ConversationHistorySidebar
+          conversations={conversationHistory}
+          activeConversationId={activeConversationId}
+          onNewConversation={handleNewConversation}
+          onSelectConversation={handleSelectConversation}
+          className="hidden lg:flex"
+        />
+
         <section className="flex min-w-0 flex-1 flex-col">
           <header className="flex h-16 shrink-0 items-center justify-between border-b border-line bg-paper/95 px-4 backdrop-blur sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsMobileHistoryOpen(true)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface text-muted transition hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10 lg:hidden"
+                aria-label={t("history.openHistory")}
+              >
+                <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
+              </button>
               <button
                 type="button"
                 onClick={() => setIsMobileSidebarOpen(true)}
@@ -367,6 +492,25 @@ export default function Home() {
           </aside>
         )}
       </div>
+
+      {isMobileHistoryOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            className="absolute inset-0 bg-ink/35"
+            onClick={() => setIsMobileHistoryOpen(false)}
+            aria-label={t("history.closeHistory")}
+          />
+          <ConversationHistorySidebar
+            conversations={conversationHistory}
+            activeConversationId={activeConversationId}
+            onNewConversation={handleNewConversation}
+            onSelectConversation={handleSelectConversation}
+            onCloseMobile={() => setIsMobileHistoryOpen(false)}
+            className="absolute left-0 top-0 h-full w-[min(88vw,320px)]"
+          />
+        </div>
+      )}
 
       {isMobileSidebarOpen && (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">

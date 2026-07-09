@@ -27,6 +27,17 @@ export type ConversationMessage = {
 };
 
 export type PersistedConversation = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  title?: string;
+  messages: ConversationMessage[];
+  latestReport: string;
+};
+
+export type ActiveConversation = {
+  id: string;
+  createdAt: string;
   messages: ConversationMessage[];
   latestReport: string;
 };

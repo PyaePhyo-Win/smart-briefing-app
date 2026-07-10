@@ -2,6 +2,7 @@
 import { useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import type { LogEntry, AppStatus, SSEEvent } from "@/lib/types";
+import { readErrorMessage } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -31,7 +32,7 @@ export function useResearchStream() {
       topic: string,
       callbacks?: {
         onToken?: (text: string) => void;
-        onDone?: () => void;
+        onDone?: (conversationId: string | null) => void;
         onError?: (message: string) => void;
       }
     ) => {
@@ -45,15 +46,17 @@ export function useResearchStream() {
         const res = await fetch(`${API_URL}/api/research/stream`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ topic: topic.trim() }),
           signal: controller.signal,
         });
 
         if (!res.ok) {
-          throw new Error(t("errors.serverError", { status: res.status }));
+          throw new Error(await readErrorMessage(res));
         }
+        if (!res.body) throw new Error(t("errors.emptyStream"));
 
-        const reader = res.body!.getReader();
+        const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
 
@@ -97,7 +100,7 @@ export function useResearchStream() {
                   return;
                 } else if (parsed.type === "done") {
                   setStatus("done");
-                  callbacks?.onDone?.();
+                  callbacks?.onDone?.(parsed.conversation_id ?? null);
                 }
               } catch {
                 // skip malformed lines

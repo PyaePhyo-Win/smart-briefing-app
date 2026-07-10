@@ -2,14 +2,14 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ChatHistoryMessage, ChatSSEEvent } from "@/lib/types";
+import type { ChatSSEEvent } from "@/lib/types";
+import { readErrorMessage } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 type SubmitChatArgs = {
+  conversationId: string;
   message: string;
-  history: ChatHistoryMessage[];
-  reportContext: string;
   onToken: (text: string) => void;
   onDone: () => void;
   onError: (message: string) => void;
@@ -22,7 +22,7 @@ export function useChatStream() {
   const abortRef = useRef<AbortController | null>(null);
 
   const submitChat = useCallback(
-    async ({ message, history, reportContext, onToken, onDone, onError }: SubmitChatArgs) => {
+    async ({ conversationId, message, onToken, onDone, onError }: SubmitChatArgs) => {
       if (!message.trim()) return;
 
       const controller = new AbortController();
@@ -34,16 +34,16 @@ export function useChatStream() {
         const res = await fetch(`${API_URL}/api/chat/stream`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
+            conversation_id: conversationId,
             message: message.trim(),
-            history,
-            report_context: reportContext,
           }),
           signal: controller.signal,
         });
 
         if (!res.ok) {
-          throw new Error(t("errors.serverError", { status: res.status }));
+          throw new Error(await readErrorMessage(res));
         }
         if (!res.body) throw new Error(t("errors.emptyStream"));
 

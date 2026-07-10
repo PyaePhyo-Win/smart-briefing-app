@@ -8,14 +8,14 @@ export type LogEvent = {
 
 export type TokenEvent = { type: "token"; text: string };
 export type ErrorEvent = { type: "error"; message: string };
-export type DoneEvent = { type: "done" };
+export type DoneEvent = { type: "done"; conversation_id?: string };
 export type SSEEvent = LogEvent | TokenEvent | ErrorEvent | DoneEvent;
 export type ChatSSEEvent = TokenEvent | ErrorEvent | DoneEvent;
 
 export type ConversationMode = "research" | "chat";
 export type ConversationRole = "user" | "assistant";
 export type ConversationMessageStatus = "streaming" | "done" | "error";
-export type ConversationMessageKind = "research" | "chat";
+export type ConversationMessageKind = "research" | "chat" | "research_report";
 
 export type ConversationMessage = {
   id: string;
@@ -35,6 +35,15 @@ export type PersistedConversation = {
   latestReport: string;
 };
 
+export type ConversationHistoryItem = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  title?: string;
+  latestMessagePreview?: string;
+  messageCount: number;
+};
+
 export type ActiveConversation = {
   id: string;
   createdAt: string;
@@ -42,9 +51,9 @@ export type ActiveConversation = {
   latestReport: string;
 };
 
-export type ChatHistoryMessage = {
-  role: ConversationRole;
-  content: string;
+export type AuthUser = {
+  id: string;
+  email: string;
 };
 
 export type LogEntry = {

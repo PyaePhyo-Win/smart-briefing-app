@@ -4,25 +4,20 @@ import { MessageSquare, PanelLeftClose, Plus, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { formatLocalDateTime } from "@/lib/dateTime";
-import type { PersistedConversation } from "@/lib/types";
+import type { ConversationHistoryItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type ConversationHistorySidebarProps = {
-  conversations: PersistedConversation[];
-  activeConversationId: string;
+  conversations: ConversationHistoryItem[];
+  activeConversationId: string | null;
   onNewConversation: () => void;
-  onSelectConversation: (conversation: PersistedConversation) => void;
+  onSelectConversation: (conversation: ConversationHistoryItem) => void;
   onCloseMobile?: () => void;
   className?: string;
 };
 
-const getConversationTitle = (conversation: PersistedConversation) => {
-  const firstUserMessage = conversation.messages.find(
-    (message) => message.role === "user" && message.content.trim().length > 0,
-  );
-
-  return conversation.title || firstUserMessage?.content.trim();
-};
+const getConversationTitle = (conversation: ConversationHistoryItem) =>
+  conversation.title || conversation.latestMessagePreview?.trim();
 
 export function ConversationHistorySidebar({
   conversations,
@@ -110,6 +105,11 @@ export function ConversationHistorySidebar({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="line-clamp-2 text-sm font-semibold leading-5">{title}</span>
+                    {conversation.latestMessagePreview ? (
+                      <span className="mt-1 block line-clamp-2 text-xs leading-5 text-muted">
+                        {conversation.latestMessagePreview}
+                      </span>
+                    ) : null}
                     <span className="mt-1 block text-xs text-muted">
                       {t("history.createdAt", {
                         value: formatLocalDateTime(conversation.createdAt),

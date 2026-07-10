@@ -1,4 +1,20 @@
 services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: smart_briefing
+      POSTGRES_USER: smart_briefing
+      POSTGRES_PASSWORD: smart_briefing
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smart_briefing -d smart_briefing"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: ./backend
@@ -11,7 +27,12 @@ services:
       # Hot-reload: mount source, exclude venv
       - ./backend:/app
       - /app/venv
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      DATABASE_URL: postgresql+psycopg://smart_briefing:smart_briefing@db:5432/smart_briefing
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
 
   frontend:
     build:
@@ -28,3 +49,6 @@ services:
     depends_on:
       - backend
     command: npm run dev
+
+volumes:
+  postgres_data:

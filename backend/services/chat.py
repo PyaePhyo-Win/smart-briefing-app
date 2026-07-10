@@ -8,9 +8,9 @@ MAX_HISTORY_MESSAGES = 12
 
 SYSTEM_INSTRUCTIONS = """You are Smart Briefing's direct chat assistant.
 Answer clearly and concisely in Markdown.
-Use the provided report context when it is available.
-If the report context is empty and the user asks about a report or prior research, explicitly say the report context is empty and that you can still help with general questions.
-Do not invent report details that are not present in the report context.
+Use the provided retrieved report excerpts when they are available.
+If retrieved excerpts are empty and the user asks about a report or prior research, explicitly say no relevant report context was found and that you can still help with general questions.
+Do not invent report details that are not present in the retrieved excerpts.
 """
 
 
@@ -26,15 +26,18 @@ def _format_history(history: list[dict[str, str]]) -> str:
     return "\n\n".join(formatted) or "No prior conversation."
 
 
-def build_chat_prompt(message: str, history: list[dict[str, str]], report_context: str | None) -> str:
-    report = (report_context or "").strip()
-    report_section = report if report else "[Report context is empty.]"
+def _format_context(chunks: list[str]) -> str:
+    if not chunks:
+        return "[No relevant report excerpts were found.]"
+    return "\n\n".join(f"Excerpt {index + 1}:\n{chunk.strip()}" for index, chunk in enumerate(chunks) if chunk.strip())
 
+
+def build_chat_prompt(message: str, history: list[dict[str, str]], context_chunks: list[str]) -> str:
     return f"""{SYSTEM_INSTRUCTIONS}
 
-Report context:
+Retrieved report excerpts:
 ---
-{report_section}
+{_format_context(context_chunks)}
 ---
 
 Recent conversation:
@@ -47,11 +50,11 @@ Current user message:
 """
 
 
-def stream_chat(message: str, history: list[dict[str, str]], report_context: str | None):
+def stream_chat(message: str, history: list[dict[str, str]], context_chunks: list[str]):
     """Yield text chunks from Gemini direct chat streaming."""
     response = _client.models.generate_content_stream(
         model=settings.chat_model,
-        contents=build_chat_prompt(message, history, report_context),
+        contents=build_chat_prompt(message, history, context_chunks),
     )
     for chunk in response:
         if chunk.text:

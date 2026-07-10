@@ -43,7 +43,7 @@ export function ConversationPanel({ messages, isRunning }: Props) {
     <section className="mx-auto flex w-full max-w-4xl flex-col gap-5">
       {messages.map((message) => {
         const isUser = message.role === "user";
-        const isResearch = message.kind === "research";
+        const isResearch = message.kind === "research" || message.kind === "research_report";
         const Icon = isUser ? User : isResearch ? FlaskConical : Bot;
         const canCopy = !isUser && message.content && message.status !== "streaming";
 

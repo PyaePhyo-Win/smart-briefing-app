@@ -2,13 +2,19 @@ import asyncio
 import json
 import logging
 import queue as q
+from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
+from sqlalchemy.orm import Session
 
 from agents.crew_runner import get_executor, run_crew
+from api.deps import get_current_user, rate_limit, validate_csrf_origin
+from db.models import Conversation, Message, Report, User, utc_now
+from db.session import get_db
 from services.polish import stream_polish
+from services.rag import index_report_chunks
 from services.streaming import register_crew_handlers, unregister_handlers
 
 logger = logging.getLogger(__name__)
@@ -34,9 +40,23 @@ def _sse(event_type: str, **data) -> str:
     return f"data: {json.dumps(body)}\n\n"
 
 
-@router.post("/api/research/stream")
-async def research_stream(req: ResearchRequest, _request: Request):
-    topic = req.topic
+@router.post(
+    "/stream",
+    dependencies=[Depends(validate_csrf_origin), Depends(rate_limit(limit=3, window_seconds=300, scope="research:stream"))],
+)
+async def research_stream(
+    request: ResearchRequest,
+    _request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    topic = request.topic
+    conversation = Conversation(user_id=current_user.id, title=topic[:120])
+    db.add(conversation)
+    db.flush()
+    db.add(Message(user_id=current_user.id, conversation_id=conversation.id, role="user", kind="research", content=topic))
+    conversation.updated_at = utc_now()
+    db.commit()
 
     async def event_stream():
         event_queue: q.Queue = q.Queue()
@@ -73,23 +93,54 @@ async def research_stream(req: ResearchRequest, _request: Request):
 
         except Exception as e:
             logger.exception("CrewAI research failed")
-            yield _sse("error", message=f"Research agent failed: {e}")
+            yield _sse("error", message="Research failed. Please try again.")
             return
         finally:
             unregister_handlers(handlers)
 
         yield _sse("log", agent="System", event="status", message="Polishing report with Gemini...")
 
+        polished_parts: list[str] = []
         try:
             for text_chunk in stream_polish(raw_report):
                 if await _request.is_disconnected():
                     return
+                polished_parts.append(text_chunk)
                 yield _sse("token", text=text_chunk)
         except Exception as e:
             logger.exception("Gemini polish failed")
-            yield _sse("error", message=f"Gemini polish failed: {e}")
+            yield _sse("error", message="Report polishing failed. Please try again.")
             return
 
-        yield _sse("done")
+        polished_report = "".join(polished_parts).strip()
+        if polished_report:
+            try:
+                report = Report(
+                    user_id=current_user.id,
+                    conversation_id=conversation.id,
+                    raw_content=raw_report,
+                    polished_content=polished_report,
+                )
+                db.add(report)
+                db.flush()
+                db.add(
+                    Message(
+                        user_id=current_user.id,
+                        conversation_id=conversation.id,
+                        role="assistant",
+                        kind="research_report",
+                        content=polished_report,
+                    )
+                )
+                conversation.updated_at = utc_now()
+                index_report_chunks(db, report)
+                db.commit()
+            except Exception:
+                db.rollback()
+                logger.exception("Report persistence failed")
+                yield _sse("error", message="Report persistence failed. Please try again.")
+                return
+
+            yield _sse("done", conversation_id=str(conversation.id))
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

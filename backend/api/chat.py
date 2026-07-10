@@ -1,31 +1,26 @@
 import json
 import logging
-from typing import Literal
+from uuid import UUID
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
+from api.deps import get_current_user, rate_limit, validate_csrf_origin
+from db.models import Conversation, Message, User, utc_now
+from db.session import get_db
 from services.chat import MAX_HISTORY_MESSAGES, stream_chat
+from services.rag import retrieve_relevant_chunks
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-class ChatHistoryMessage(BaseModel):
-    role: Literal["user", "assistant"]
-    content: str = Field(max_length=12000)
-
-    @field_validator("content")
-    @classmethod
-    def validate_content(cls, value: str) -> str:
-        return value.strip()
-
-
 class ChatRequest(BaseModel):
+    conversation_id: UUID
     message: str
-    history: list[ChatHistoryMessage] = Field(default_factory=list, max_length=MAX_HISTORY_MESSAGES)
-    report_context: str | None = Field(default=None, max_length=50000)
 
     @field_validator("message")
     @classmethod
@@ -43,19 +38,67 @@ def _sse(event_type: str, **data) -> str:
     return f"data: {json.dumps(body)}\n\n"
 
 
-@router.post("/api/chat/stream")
-async def chat_stream(req: ChatRequest, request: Request):
+@router.post(
+    "/api/chat/stream",
+    dependencies=[Depends(validate_csrf_origin), Depends(rate_limit(limit=12, window_seconds=300, scope="chat:stream"))],
+)
+async def chat_stream(
+    req: ChatRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    conversation = db.scalar(
+        select(Conversation).where(Conversation.id == req.conversation_id, Conversation.user_id == current_user.id)
+    )
+    if conversation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+
+    previous_messages = list(
+        db.scalars(
+            select(Message)
+            .where(Message.conversation_id == conversation.id, Message.role.in_(["user", "assistant"]))
+            .order_by(Message.created_at.desc())
+            .limit(MAX_HISTORY_MESSAGES)
+        )
+    )
+    history = [
+        {"role": message.role, "content": message.content}
+        for message in reversed(previous_messages)
+        if message.role in {"user", "assistant"}
+    ]
+    context_chunks = [chunk.content for chunk in retrieve_relevant_chunks(db, current_user.id, conversation.id, req.message)]
+
+    db.add(Message(user_id=current_user.id, conversation_id=conversation.id, role="user", kind="chat", content=req.message))
+    conversation.updated_at = utc_now()
+    db.commit()
+
     async def event_stream():
+        assistant_parts: list[str] = []
         try:
-            history = [item.model_dump() for item in req.history[-MAX_HISTORY_MESSAGES:]]
-            for text_chunk in stream_chat(req.message, history, req.report_context):
+            for text_chunk in stream_chat(req.message, history, context_chunks):
                 if await request.is_disconnected():
                     return
+                assistant_parts.append(text_chunk)
                 yield _sse("token", text=text_chunk)
         except Exception as exc:
             logger.exception("Gemini chat failed")
-            yield _sse("error", message=f"Gemini chat failed: {exc}")
+            yield _sse("error", message="Chat failed. Please try again.")
             return
+
+        assistant_text = "".join(assistant_parts).strip()
+        if assistant_text:
+            db.add(
+                Message(
+                    user_id=current_user.id,
+                    conversation_id=conversation.id,
+                    role="assistant",
+                    kind="chat",
+                    content=assistant_text,
+                )
+            )
+            conversation.updated_at = utc_now()
+            db.commit()
 
         yield _sse("done")
 

@@ -2,6 +2,9 @@ from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+EMBEDDING_DIMENSION = 1024
+
+
 class Settings(BaseSettings):
     gemini_api_key: str = ""
     serper_api_key: str = ""
@@ -12,12 +15,43 @@ class Settings(BaseSettings):
     max_crew_workers: int = 4
     log_level: str = "INFO"
 
+    database_url: str = "postgresql+psycopg://smart_briefing:smart_briefing@localhost:5432/smart_briefing"
+    voyage_api_key: str = ""
+    voyage_embedding_model: str = "voyage-4"
+    voyage_embedding_dimension: int = EMBEDDING_DIMENSION
+    rag_top_k: int = 6
+    rag_chunk_size: int = 1800
+    rag_chunk_overlap: int = 240
+
+    session_cookie_name: str = "smart_briefing_session"
+    session_cookie_secure: bool = False
+    session_cookie_samesite: str = "lax"
+    session_expire_days: int = 30
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
+    @property
+    def allowed_origin_list(self) -> list[str]:
+        return [origin.strip().rstrip("/") for origin in self.allowed_origins.split(",") if origin.strip()]
+
     @model_validator(mode="after")
-    def require_gemini_api_key(self) -> "Settings":
+    def require_api_keys(self) -> "Settings":
         if not self.gemini_api_key:
             raise ValueError("GEMINI_API_KEY is required. Set it in backend/.env or the environment.")
+        if not self.voyage_api_key:
+            raise ValueError("VOYAGE_API_KEY is required. Set it in backend/.env or the environment.")
+
+        self.session_cookie_samesite = self.session_cookie_samesite.lower()
+        if self.session_cookie_samesite not in {"lax", "strict", "none"}:
+            raise ValueError("SESSION_COOKIE_SAMESITE must be one of: lax, strict, none")
+        if self.session_cookie_samesite == "none" and not self.session_cookie_secure:
+            raise ValueError("SESSION_COOKIE_SECURE must be true when SESSION_COOKIE_SAMESITE=none")
+        if "*" in self.allowed_origin_list:
+            raise ValueError("ALLOWED_ORIGINS cannot include '*' when credentialed CORS is enabled")
+        if self.voyage_embedding_dimension != EMBEDDING_DIMENSION:
+            raise ValueError(f"VOYAGE_EMBEDDING_DIMENSION must be {EMBEDDING_DIMENSION} to match the database schema")
+        if self.rag_chunk_overlap >= self.rag_chunk_size:
+            raise ValueError("RAG_CHUNK_OVERLAP must be smaller than RAG_CHUNK_SIZE")
         return self
 
 

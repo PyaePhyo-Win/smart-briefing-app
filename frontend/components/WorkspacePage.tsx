@@ -84,6 +84,10 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isMobileHistoryOpen, setIsMobileHistoryOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const historyOpenButtonRef = useRef<HTMLButtonElement | null>(null);
+  const workspaceOpenButtonRef = useRef<HTMLButtonElement | null>(null);
+  const historyDialogRef = useRef<HTMLDivElement | null>(null);
+  const workspaceDialogRef = useRef<HTMLDivElement | null>(null);
 
   const resetConversationState = useCallback(() => {
     setActiveConversationId(null);
@@ -165,6 +169,16 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
+
+  const closeMobileHistory = useCallback(() => {
+    setIsMobileHistoryOpen(false);
+    historyOpenButtonRef.current?.focus();
+  }, []);
+
+  const closeMobileWorkspace = useCallback(() => {
+    setIsMobileSidebarOpen(false);
+    workspaceOpenButtonRef.current?.focus();
+  }, []);
 
   const isAnyRunning = isRunning || isChatRunning;
   const visibleError = uiErrorMessage ?? errorMessage ?? chatErrorMessage;
@@ -369,9 +383,9 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
 
     setUiErrorMessage(null);
     resetConversationState();
-    setIsMobileHistoryOpen(false);
+    closeMobileHistory();
     router.replace("/");
-  }, [abort, abortChat, isChatRunning, isRunning, resetConversationState, router]);
+  }, [abort, abortChat, closeMobileHistory, isChatRunning, isRunning, resetConversationState, router]);
 
   const handleSelectConversation = useCallback(
     (conversation: ConversationHistoryItem) => {
@@ -379,13 +393,13 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
       if (isChatRunning) abortChat();
 
       setUiErrorMessage(null);
-      setIsMobileHistoryOpen(false);
+      closeMobileHistory();
       router.replace(`/conversations/${conversation.id}`);
       void loadConversation(conversation.id).catch((error) => {
         setUiErrorMessage(error instanceof Error ? error.message : t("errors.backendUnreachable"));
       });
     },
-    [abort, abortChat, isChatRunning, isRunning, loadConversation, router, t]
+    [abort, abortChat, closeMobileHistory, isChatRunning, isRunning, loadConversation, router, t]
   );
 
   return (
@@ -406,6 +420,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
             <div className="flex min-w-0 items-center gap-3">
               {showWorkspaceShell ? (
                 <button
+                  ref={historyOpenButtonRef}
                   type="button"
                   onClick={() => setIsMobileHistoryOpen(true)}
                   className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface text-muted transition hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10 lg:hidden"
@@ -415,6 +430,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
                 </button>
               ) : null}
               <button
+                ref={workspaceOpenButtonRef}
                 type="button"
                 onClick={() => setIsMobileSidebarOpen(true)}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface text-muted transition hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10 lg:hidden"
@@ -566,11 +582,17 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
       </div>
 
       {showWorkspaceShell && isMobileHistoryOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+        <div
+          ref={historyDialogRef}
+          className="fixed inset-0 z-50 lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+        >
           <button
             type="button"
             className="absolute inset-0 bg-ink/35"
-            onClick={() => setIsMobileHistoryOpen(false)}
+            onClick={closeMobileHistory}
             aria-label={t("history.closeHistory")}
           />
           <ConversationHistorySidebar
@@ -578,18 +600,24 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
             activeConversationId={activeConversationId}
             onNewConversation={handleNewConversation}
             onSelectConversation={handleSelectConversation}
-            onCloseMobile={() => setIsMobileHistoryOpen(false)}
+            onCloseMobile={closeMobileHistory}
             className="absolute left-0 top-0 h-full w-[min(88vw,320px)]"
           />
         </div>
       )}
 
       {isMobileSidebarOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+        <div
+          ref={workspaceDialogRef}
+          className="fixed inset-0 z-50 lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+        >
           <button
             type="button"
             className="absolute inset-0 bg-ink/35"
-            onClick={() => setIsMobileSidebarOpen(false)}
+            onClick={closeMobileWorkspace}
             aria-label={t("header.closeWorkspaceOverlay")}
           />
           <aside className="absolute right-0 top-0 flex h-full w-[min(92vw,420px)] flex-col border-l border-line bg-surface p-4 shadow-soft">
@@ -599,7 +627,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
               </p>
               <button
                 type="button"
-                onClick={() => setIsMobileSidebarOpen(false)}
+                onClick={closeMobileWorkspace}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface text-muted transition hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10"
                 aria-label={t("header.closeWorkspace")}
               >

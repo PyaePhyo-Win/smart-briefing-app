@@ -10,14 +10,14 @@ from api.deps import get_current_user, rate_limit, validate_csrf_origin
 from config import settings
 from db.models import User
 from db.session import get_db
-from services.auth import create_session, delete_session_token, hash_password, verify_password
+from services.auth import create_session, delete_session_token, hash_password, verify_and_update_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 class AuthRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=8, max_length=1024)
 
     @field_validator("email")
     @classmethod
@@ -86,8 +86,16 @@ def register(payload: AuthRequest, response: Response, db: Session = Depends(get
 )
 def login(payload: AuthRequest, response: Response, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.email == payload.email))
-    if user is None or not verify_password(payload.password, user.password_hash):
+    if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+
+    password_valid, updated_hash = verify_and_update_password(payload.password, user.password_hash)
+    if not password_valid:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+
+    if updated_hash is not None:
+        user.password_hash = updated_hash
+        db.commit()
 
     token, _session = create_session(db, user)
     _set_session_cookie(response, token)

@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:3000"
     max_crew_workers: int = 4
     log_level: str = "INFO"
+    trusted_proxy_ips: str = ""
+    rate_limit_max_keys: int = 10000
 
     database_url: str = "postgresql+psycopg://smart_briefing:smart_briefing@localhost:5432/smart_briefing"
     voyage_api_key: str = ""
@@ -34,12 +36,18 @@ class Settings(BaseSettings):
     def allowed_origin_list(self) -> list[str]:
         return [origin.strip().rstrip("/") for origin in self.allowed_origins.split(",") if origin.strip()]
 
+    @property
+    def trusted_proxy_ip_list(self) -> list[str]:
+        return [proxy.strip() for proxy in self.trusted_proxy_ips.split(",") if proxy.strip()]
+
     @model_validator(mode="after")
     def require_api_keys(self) -> "Settings":
         if not self.gemini_api_key:
             raise ValueError("GEMINI_API_KEY is required. Set it in backend/.env or the environment.")
         if not self.voyage_api_key:
             raise ValueError("VOYAGE_API_KEY is required. Set it in backend/.env or the environment.")
+        if self.rate_limit_max_keys < 1:
+            raise ValueError("RATE_LIMIT_MAX_KEYS must be at least 1")
 
         self.session_cookie_samesite = self.session_cookie_samesite.lower()
         if self.session_cookie_samesite not in {"lax", "strict", "none"}:

@@ -3,7 +3,7 @@ export type LogEvent = {
   agent: string;
   event: string;
   message: string;
-  timestamp: string;
+  timestamp?: string;
 };
 
 export type TokenEvent = { type: "token"; text: string };

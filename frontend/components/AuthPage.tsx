@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { ApiError, fetchCurrentUser, loginUser, registerUser } from "@/lib/api";
 
 export type AuthMode = "login" | "register";
@@ -87,108 +85,76 @@ export function AuthPage({ mode }: AuthPageProps) {
   const alternateLabel = mode === "login" ? t("auth.switchToRegister") : t("auth.switchToLogin");
 
   return (
-    <main className="min-h-screen bg-paper text-ink">
-      <header className="flex h-16 items-center justify-between border-b border-line bg-paper/95 px-4 backdrop-blur sm:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line bg-surface shadow-soft">
-            <Sparkles className="h-4 w-4 text-rust" aria-hidden="true" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted">
-              {t("app.title")}
-            </p>
-            <h1 className="truncate font-serif text-xl font-medium tracking-[-0.03em] text-ink">
-              {t("app.subtitle")}
-            </h1>
-          </div>
+    <section className="rounded-[2rem] border border-line bg-surface p-5 shadow-soft sm:p-7">
+      <div>
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-rust/20 bg-rust/5 px-3 py-1.5 text-xs font-medium text-rust">
+          <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+          {t("app.badge")}
         </div>
-        <div className="flex items-center gap-2">
-          <LanguageSwitcher />
-          <ThemeToggle />
-        </div>
-      </header>
-
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-4xl flex-col justify-center gap-5 px-4 py-8 sm:px-6 lg:px-8">
-        <div className="rounded-3xl border border-line bg-surface p-5 shadow-soft sm:p-7">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-rust/20 bg-rust/5 px-3 py-1.5 text-xs font-medium text-rust">
-            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-            {t("app.badge")}
-          </div>
-          <h2 className="font-serif text-3xl font-medium tracking-[-0.04em] text-ink sm:text-4xl">
-            {t("app.heroTitle")}
-          </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted sm:text-base">
-            {t("app.heroDescription")}
-          </p>
-        </div>
-
-        <section className="rounded-[2rem] border border-line bg-surface p-5 shadow-soft sm:p-7">
-          <div className="max-w-xl">
-            <h2 className="font-serif text-3xl font-medium tracking-[-0.04em] text-ink">
-              {t("auth.title")}
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-muted">
-              {isInitializing ? t("auth.loading") : t("auth.body")}
-            </p>
-          </div>
-
-          {errorMessage ? (
-            <div className="mt-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-surface px-5 py-4 text-sm leading-6 text-red-700 shadow-soft dark:border-red-900/60 dark:text-red-300">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-300" aria-hidden="true" />
-              <span>{errorMessage}</span>
-            </div>
-          ) : null}
-
-          <form onSubmit={handleSubmit} className="mt-6 max-w-xl space-y-4">
-            <div>
-              <label htmlFor="auth-email" className="mb-2 block text-sm font-semibold text-ink">
-                {t("auth.email")}
-              </label>
-              <input
-                id="auth-email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm text-ink outline-none transition focus:border-rust focus:ring-4 focus:ring-rust/10"
-                disabled={isInitializing || isSubmitting}
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="auth-password" className="mb-2 block text-sm font-semibold text-ink">
-                {t("auth.password")}
-              </label>
-              <input
-                id="auth-password"
-                type="password"
-                autoComplete={mode === "login" ? "current-password" : "new-password"}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm text-ink outline-none transition focus:border-rust focus:ring-4 focus:ring-rust/10"
-                disabled={isInitializing || isSubmitting}
-                minLength={8}
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <button
-                type="submit"
-                disabled={isInitializing || isSubmitting}
-                className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-rust px-6 py-3 text-sm font-semibold text-white transition hover:bg-rust/90 focus:outline-none focus:ring-4 focus:ring-rust/20 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {submitLabel}
-              </button>
-              <Link
-                href={alternateHref}
-                className="text-sm font-semibold text-muted transition hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10"
-              >
-                {alternateLabel}
-              </Link>
-            </div>
-          </form>
-        </section>
+        <h2 className="font-serif text-3xl font-medium tracking-[-0.04em] text-ink">
+          {t("auth.title")}
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-muted">
+          {isInitializing ? t("auth.loading") : t("auth.body")}
+        </p>
       </div>
-    </main>
+
+      {errorMessage ? (
+        <div className="mt-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-paper px-5 py-4 text-sm leading-6 text-red-700 shadow-sm dark:border-red-900/60 dark:text-red-300">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-300" aria-hidden="true" />
+          <span>{errorMessage}</span>
+        </div>
+      ) : null}
+
+      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        <div>
+          <label htmlFor="auth-email" className="mb-2 block text-sm font-semibold text-ink">
+            {t("auth.email")}
+          </label>
+          <input
+            id="auth-email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            className="w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm text-ink outline-none transition focus:border-rust focus:ring-4 focus:ring-rust/10"
+            disabled={isInitializing || isSubmitting}
+            required
+          />
+        </div>
+        <div>
+          <label htmlFor="auth-password" className="mb-2 block text-sm font-semibold text-ink">
+            {t("auth.password")}
+          </label>
+          <input
+            id="auth-password"
+            type="password"
+            autoComplete={mode === "login" ? "current-password" : "new-password"}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            className="w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm text-ink outline-none transition focus:border-rust focus:ring-4 focus:ring-rust/10"
+            disabled={isInitializing || isSubmitting}
+            minLength={8}
+            maxLength={1024}
+            required
+          />
+        </div>
+        <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center">
+          <button
+            type="submit"
+            disabled={isInitializing || isSubmitting}
+            className="inline-flex min-h-12 flex-1 items-center justify-center rounded-2xl bg-rust px-6 py-3 text-sm font-semibold text-white transition hover:bg-rust/90 focus:outline-none focus:ring-4 focus:ring-rust/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitLabel}
+          </button>
+          <Link
+            href={alternateHref}
+            className="text-center text-sm font-semibold text-muted transition hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10 sm:text-left"
+          >
+            {alternateLabel}
+          </Link>
+        </div>
+      </form>
+    </section>
   );
 }

@@ -57,6 +57,19 @@ async def research_stream(
     db.add(Message(user_id=current_user.id, conversation_id=conversation.id, role="user", kind="research", content=topic))
     conversation.updated_at = utc_now()
     db.commit()
+    conversation_id = conversation.id
+
+    def cleanup_incomplete_conversation(reason: str) -> None:
+        try:
+            db.rollback()
+            incomplete_conversation = db.get(Conversation, conversation_id)
+            if incomplete_conversation is not None:
+                db.delete(incomplete_conversation)
+                db.commit()
+                logger.info("Removed incomplete research conversation %s after %s", conversation_id, reason)
+        except Exception:
+            db.rollback()
+            logger.exception("Failed to remove incomplete research conversation %s", conversation_id)
 
     async def event_stream():
         event_queue: q.Queue = q.Queue()
@@ -70,10 +83,14 @@ async def research_stream(
             crew_future = loop.run_in_executor(get_executor(), run_crew, topic)
 
             while not crew_future.done():
-                # Check for client disconnect — abort early to avoid wasting LLM tokens
                 if await _request.is_disconnected():
-                    crew_future.cancel()
-                    logger.info("Client disconnected — aborting research stream")
+                    cancel_requested = crew_future.cancel()
+                    logger.info(
+                        "Client disconnected; requested best-effort research cancellation for conversation %s (accepted=%s)",
+                        conversation_id,
+                        cancel_requested,
+                    )
+                    cleanup_incomplete_conversation("client disconnect during research")
                     return
                 try:
                     event = event_queue.get(timeout=0.1)
@@ -93,6 +110,7 @@ async def research_stream(
 
         except Exception as e:
             logger.exception("CrewAI research failed")
+            cleanup_incomplete_conversation("research failure")
             yield _sse("error", message="Research failed. Please try again.")
             return
         finally:
@@ -104,11 +122,14 @@ async def research_stream(
         try:
             for text_chunk in stream_polish(raw_report):
                 if await _request.is_disconnected():
+                    logger.info("Client disconnected during report polishing for conversation %s", conversation_id)
+                    cleanup_incomplete_conversation("client disconnect during polishing")
                     return
                 polished_parts.append(text_chunk)
                 yield _sse("token", text=text_chunk)
         except Exception as e:
             logger.exception("Gemini polish failed")
+            cleanup_incomplete_conversation("polish failure")
             yield _sse("error", message="Report polishing failed. Please try again.")
             return
 
@@ -117,7 +138,7 @@ async def research_stream(
             try:
                 report = Report(
                     user_id=current_user.id,
-                    conversation_id=conversation.id,
+                    conversation_id=conversation_id,
                     raw_content=raw_report,
                     polished_content=polished_report,
                 )
@@ -126,21 +147,25 @@ async def research_stream(
                 db.add(
                     Message(
                         user_id=current_user.id,
-                        conversation_id=conversation.id,
+                        conversation_id=conversation_id,
                         role="assistant",
                         kind="research_report",
                         content=polished_report,
                     )
                 )
-                conversation.updated_at = utc_now()
+                conversation_to_update = db.get(Conversation, conversation_id)
+                if conversation_to_update is None:
+                    raise RuntimeError("Research conversation was removed before persistence completed")
+                conversation_to_update.updated_at = utc_now()
                 index_report_chunks(db, report)
                 db.commit()
             except Exception:
                 db.rollback()
                 logger.exception("Report persistence failed")
+                cleanup_incomplete_conversation("persistence failure")
                 yield _sse("error", message="Report persistence failed. Please try again.")
                 return
 
-            yield _sse("done", conversation_id=str(conversation.id))
+            yield _sse("done", conversation_id=str(conversation_id))
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

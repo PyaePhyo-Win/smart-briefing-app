@@ -16,13 +16,34 @@ UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 _RATE_LIMITS: dict[str, deque[datetime]] = defaultdict(deque)
 
 
-def _client_ip(request: Request) -> str:
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        return forwarded_for.split(",", 1)[0].strip()
+def _remote_host(request: Request) -> str:
     if request.client:
         return request.client.host
     return "unknown"
+
+
+def _client_ip(request: Request) -> str:
+    remote_host = _remote_host(request)
+    if remote_host in settings.trusted_proxy_ip_list:
+        forwarded_for = request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            first_hop = forwarded_for.split(",", 1)[0].strip()
+            if first_hop:
+                return first_hop
+    return remote_host
+
+
+def _prune_rate_limit_buckets(cutoff: datetime) -> None:
+    for key in list(_RATE_LIMITS.keys()):
+        hits = _RATE_LIMITS[key]
+        while hits and hits[0] <= cutoff:
+            hits.popleft()
+        if not hits:
+            del _RATE_LIMITS[key]
+
+    while len(_RATE_LIMITS) > settings.rate_limit_max_keys:
+        oldest_key = min(_RATE_LIMITS, key=lambda key: _RATE_LIMITS[key][0] if _RATE_LIMITS[key] else cutoff)
+        del _RATE_LIMITS[oldest_key]
 
 
 def _normalize_origin(value: str) -> str:
@@ -49,6 +70,7 @@ def rate_limit(limit: int, window_seconds: int, scope: str) -> Callable[[Request
     def dependency(request: Request) -> None:
         now = datetime.now(timezone.utc)
         cutoff = now - timedelta(seconds=window_seconds)
+        _prune_rate_limit_buckets(cutoff)
         key = f"{scope}:{_client_ip(request)}"
         hits = _RATE_LIMITS[key]
         while hits and hits[0] <= cutoff:

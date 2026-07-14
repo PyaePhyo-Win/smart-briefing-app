@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowRight, LockKeyhole, Mail, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, fetchCurrentUser, loginUser, registerUser } from "@/lib/api";
@@ -83,76 +83,90 @@ export function AuthPage({ mode }: AuthPageProps) {
   const submitLabel = mode === "login" ? t("auth.login") : t("auth.register");
   const alternateHref = mode === "login" ? "/register" : "/login";
   const alternateLabel = mode === "login" ? t("auth.switchToRegister") : t("auth.switchToLogin");
+  const title = mode === "login" ? t("auth.loginTitle") : t("auth.registerTitle");
+  const body = mode === "login" ? t("auth.loginBody") : t("auth.registerBody");
 
   return (
-    <section className="rounded-[2rem] border border-line bg-surface p-5 shadow-soft sm:p-7">
+    <section className="w-full rounded-[1.75rem] border border-line bg-surface/95 p-5 shadow-soft backdrop-blur sm:rounded-[2rem] sm:p-7 lg:p-8">
       <div>
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-rust/20 bg-rust/5 px-3 py-1.5 text-xs font-medium text-rust">
-          <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+          <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           {t("app.badge")}
         </div>
-        <h2 className="font-serif text-3xl font-medium tracking-[-0.04em] text-ink">
-          {t("auth.title")}
+        <h2 className="font-serif text-3xl font-medium tracking-[-0.04em] text-ink sm:text-4xl">
+          {title}
         </h2>
-        <p className="mt-3 text-sm leading-6 text-muted">
-          {isInitializing ? t("auth.loading") : t("auth.body")}
+        <p className="mt-3 text-sm leading-6 text-muted sm:text-base sm:leading-7">
+          {isInitializing ? t("auth.loading") : body}
         </p>
       </div>
 
       {errorMessage ? (
-        <div className="mt-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-paper px-5 py-4 text-sm leading-6 text-red-700 shadow-sm dark:border-red-900/60 dark:text-red-300">
+        <div className="mt-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-paper px-4 py-3.5 text-sm leading-6 text-red-700 shadow-sm dark:border-red-900/60 dark:text-red-300 sm:px-5 sm:py-4">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-300" aria-hidden="true" />
           <span>{errorMessage}</span>
         </div>
       ) : null}
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+      <form onSubmit={handleSubmit} className="mt-6 space-y-4 sm:mt-7">
         <div>
           <label htmlFor="auth-email" className="mb-2 block text-sm font-semibold text-ink">
             {t("auth.email")}
           </label>
-          <input
-            id="auth-email"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm text-ink outline-none transition focus:border-rust focus:ring-4 focus:ring-rust/10"
-            disabled={isInitializing || isSubmitting}
-            required
-          />
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
+            <input
+              id="auth-email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="w-full rounded-2xl border border-line bg-paper py-3 pl-11 pr-4 text-base text-ink outline-none transition placeholder:text-muted/70 focus:border-rust focus:ring-4 focus:ring-rust/10 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
+              disabled={isInitializing || isSubmitting}
+              placeholder="you@example.com"
+              required
+            />
+          </div>
         </div>
         <div>
           <label htmlFor="auth-password" className="mb-2 block text-sm font-semibold text-ink">
             {t("auth.password")}
           </label>
-          <input
-            id="auth-password"
-            type="password"
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm text-ink outline-none transition focus:border-rust focus:ring-4 focus:ring-rust/10"
-            disabled={isInitializing || isSubmitting}
-            minLength={8}
-            maxLength={1024}
-            required
-          />
+          <div className="relative">
+            <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
+            <input
+              id="auth-password"
+              type="password"
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="w-full rounded-2xl border border-line bg-paper py-3 pl-11 pr-4 text-base text-ink outline-none transition placeholder:text-muted/70 focus:border-rust focus:ring-4 focus:ring-rust/10 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
+              disabled={isInitializing || isSubmitting}
+              minLength={8}
+              maxLength={1024}
+              placeholder={t("auth.passwordPlaceholder")}
+              required
+            />
+          </div>
+          <p className="mt-2 text-xs leading-5 text-muted">{t("auth.passwordHint")}</p>
         </div>
-        <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center">
+        <div className="space-y-4 pt-2">
           <button
             type="submit"
             disabled={isInitializing || isSubmitting}
-            className="inline-flex min-h-12 flex-1 items-center justify-center rounded-2xl bg-rust px-6 py-3 text-sm font-semibold text-white transition hover:bg-rust/90 focus:outline-none focus:ring-4 focus:ring-rust/20 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rust px-6 py-3 text-sm font-semibold text-white transition hover:bg-rust/90 focus:outline-none focus:ring-4 focus:ring-rust/20 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {submitLabel}
+            <span>{isSubmitting ? t("auth.submitting") : submitLabel}</span>
+            <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
           </button>
-          <Link
-            href={alternateHref}
-            className="text-center text-sm font-semibold text-muted transition hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10 sm:text-left"
-          >
-            {alternateLabel}
-          </Link>
+          <p className="text-center text-sm text-muted">
+            <Link
+              href={alternateHref}
+              className="font-semibold text-rust transition hover:text-rust/80 focus:outline-none focus:ring-4 focus:ring-rust/10"
+            >
+              {alternateLabel}
+            </Link>
+          </p>
         </div>
       </form>
     </section>

@@ -8,10 +8,10 @@ import { readErrorMessage } from "@/lib/api";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 type SubmitChatArgs = {
-  conversationId: string;
+  conversationId?: string | null;
   message: string;
   onToken: (text: string) => void;
-  onDone: () => void;
+  onDone: (conversationId?: string) => void;
   onError: (message: string) => void;
 };
 
@@ -36,7 +36,7 @@ export function useChatStream() {
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            conversation_id: conversationId,
+            conversation_id: conversationId ?? null,
             message: message.trim(),
           }),
           signal: controller.signal,
@@ -73,7 +73,7 @@ export function useChatStream() {
                   onError(parsed.message);
                   return;
                 } else if (parsed.type === "done") {
-                  onDone();
+                  onDone(parsed.conversation_id);
                 }
               } catch {
                 // Ignore malformed stream lines.

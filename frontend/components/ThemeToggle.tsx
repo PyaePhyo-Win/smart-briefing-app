@@ -3,8 +3,13 @@
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { cn } from "@/lib/utils";
 
 type Theme = "light" | "dark";
+
+type ThemeToggleProps = {
+  compact?: boolean;
+};
 
 const STORAGE_KEY = "smart-briefing-theme";
 
@@ -23,7 +28,7 @@ const applyTheme = (theme: Theme) => {
   document.documentElement.classList.toggle("dark", theme === "dark");
 };
 
-export function ThemeToggle() {
+export function ThemeToggle({ compact = false }: ThemeToggleProps) {
   const { t } = useTranslation();
   const [theme, setTheme] = useState<Theme>("light");
   const [mounted, setMounted] = useState(false);
@@ -52,14 +57,19 @@ export function ThemeToggle() {
         mode: isDark ? t("theme.light") : t("theme.dark"),
       })}
       aria-pressed={isDark}
-      className="inline-flex h-11 items-center gap-2 rounded-full border border-line bg-surface px-3.5 text-sm font-medium text-muted shadow-soft transition duration-200 hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10"
+      className={cn(
+        "inline-flex h-11 items-center gap-2 rounded-full border border-line bg-surface px-3.5 text-sm font-medium text-muted shadow-soft transition duration-200 hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10",
+        compact && "h-10 px-3 sm:h-11 sm:px-3.5",
+      )}
     >
       {mounted && isDark ? (
         <Sun className="h-4 w-4 shrink-0" aria-hidden="true" />
       ) : (
         <Moon className="h-4 w-4 shrink-0" aria-hidden="true" />
       )}
-      <span>{mounted && isDark ? t("theme.light") : t("theme.dark")}</span>
+      <span className={cn(compact && "sr-only sm:not-sr-only")}>
+        {mounted && isDark ? t("theme.light") : t("theme.dark")}
+      </span>
     </button>
   );
 }

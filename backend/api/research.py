@@ -18,7 +18,7 @@ from services.rag import index_report_chunks
 from services.streaming import register_crew_handlers, unregister_handlers
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(prefix="/api/research", tags=["research"])
 
 
 class ResearchRequest(BaseModel):

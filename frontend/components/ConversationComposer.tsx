@@ -10,7 +10,6 @@ interface Props {
   onModeChange: (mode: ConversationMode) => void;
   onSubmit: (mode: ConversationMode, value: string) => void;
   onAbort: () => void;
-  canChat: boolean;
   isRunning: boolean;
   isResearchRunning: boolean;
   isChatRunning: boolean;
@@ -30,7 +29,6 @@ export function ConversationComposer({
   onModeChange,
   onSubmit,
   onAbort,
-  canChat,
   isRunning,
   isResearchRunning,
   isChatRunning,
@@ -71,7 +69,7 @@ export function ConversationComposer({
                 key={item}
                 type="button"
                 onClick={() => onModeChange(item)}
-                disabled={isRunning || (item === "chat" && !canChat)}
+                disabled={isRunning}
                 className={`inline-flex h-9 items-center gap-2 rounded-full border px-4 text-xs font-semibold transition focus:outline-none focus:ring-4 focus:ring-rust/10 disabled:cursor-not-allowed disabled:opacity-50 ${
                   isActive
                     ? "border-rust bg-rust text-white"
@@ -128,10 +126,6 @@ export function ConversationComposer({
             count: activeConfig.maxLength - value.length,
           })}
         </p>
-      )}
-
-      {!canChat && !isRunning && (
-        <p className="ml-3 mt-2 text-xs text-muted">{t("composer.chatRequiresResearch")}</p>
       )}
     </form>
   );

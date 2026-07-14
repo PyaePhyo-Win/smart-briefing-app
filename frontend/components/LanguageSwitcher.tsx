@@ -3,6 +3,7 @@
 import { Languages } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -11,7 +12,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export function LanguageSwitcher() {
+type LanguageSwitcherProps = {
+  compact?: boolean;
+};
+
+export function LanguageSwitcher({ compact = false }: LanguageSwitcherProps) {
   const { i18n, t } = useTranslation();
   const language = i18n.resolvedLanguage?.startsWith("my") ? "my" : "en";
 
@@ -23,7 +28,10 @@ export function LanguageSwitcher() {
           void i18n.changeLanguage(value);
         }}
       >
-        <SelectTrigger aria-label={t("language.label")} className="w-[9.5rem]">
+        <SelectTrigger
+          aria-label={t("language.label")}
+          className={cn("w-[9.5rem]", compact && "h-10 w-[5.75rem] px-3 sm:h-11 sm:w-[9.5rem] sm:px-3.5")}
+        >
           <Languages className="h-4 w-4 shrink-0" aria-hidden="true" />
           <SelectValue />
         </SelectTrigger>

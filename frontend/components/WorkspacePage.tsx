@@ -78,7 +78,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [conversationHistory, setConversationHistory] = useState<ConversationHistoryItem[]>([]);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
-  const [latestReport, setLatestReport] = useState("");
+  const [, setLatestReport] = useState("");
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -182,7 +182,6 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
 
   const isAnyRunning = isRunning || isChatRunning;
   const visibleError = uiErrorMessage ?? errorMessage ?? chatErrorMessage;
-  const canChat = Boolean(activeConversationId && latestReport.trim().length > 0);
   const showWorkspaceShell = Boolean(currentUser && !isInitializing);
 
   const refreshConversationHistory = useCallback(
@@ -319,13 +318,9 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
         return;
       }
 
-      if (!activeConversationId) {
-        setUiErrorMessage(t("errors.chatRequiresConversation"));
-        return;
-      }
-
-      const nextMessages = [...messages, userMessage, assistantMessage];
+      const nextMessages = activeConversationId ? [...messages, userMessage, assistantMessage] : [userMessage, assistantMessage];
       setMessages(nextMessages);
+      setMode("chat");
 
       void submitChat({
         conversationId: activeConversationId,
@@ -338,7 +333,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
             }))
           );
         },
-        onDone: async () => {
+        onDone: async (conversationId) => {
           setMessages((current) =>
             updateMessage(current, assistantId, (message) => ({
               ...message,
@@ -346,9 +341,17 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
             }))
           );
 
+          const resolvedConversationId = conversationId ?? activeConversationId;
+          if (!resolvedConversationId) {
+            setUiErrorMessage(t("errors.backendUnreachable"));
+            return;
+          }
+
           try {
-            await refreshConversationHistory(activeConversationId);
-            await loadConversation(activeConversationId);
+            await refreshConversationHistory(resolvedConversationId);
+            await loadConversation(resolvedConversationId);
+            setMode("chat");
+            router.replace(`/conversations/${resolvedConversationId}`);
           } catch (error) {
             setUiErrorMessage(error instanceof Error ? error.message : t("errors.backendUnreachable"));
           }
@@ -550,7 +553,6 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
                     onModeChange={setMode}
                     onSubmit={handleConversationSubmit}
                     onAbort={handleAbort}
-                    canChat={canChat}
                     isRunning={isAnyRunning}
                     isResearchRunning={isRunning}
                     isChatRunning={isChatRunning}

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Sparkles } from "lucide-react";
+import { BookOpenText, MessageSquareText, ShieldCheck, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -41,28 +41,54 @@ export function AuthLayout({ children }: AuthLayoutProps) {
               />
             </div>
           </div>
+
+          <div className="relative z-10 grid gap-3 text-sm text-muted xl:grid-cols-3">
+            <div className="rounded-2xl border border-white/50 bg-surface/70 p-4 backdrop-blur dark:border-white/10">
+              <BookOpenText className="mb-3 h-5 w-5 text-rust" aria-hidden="true" />
+              <p className="font-semibold text-ink">{t("auth.featureResearch")}</p>
+            </div>
+            <div className="rounded-2xl border border-white/50 bg-surface/70 p-4 backdrop-blur dark:border-white/10">
+              <MessageSquareText className="mb-3 h-5 w-5 text-rust" aria-hidden="true" />
+              <p className="font-semibold text-ink">{t("auth.featureChat")}</p>
+            </div>
+            <div className="rounded-2xl border border-white/50 bg-surface/70 p-4 backdrop-blur dark:border-white/10">
+              <ShieldCheck className="mb-3 h-5 w-5 text-rust" aria-hidden="true" />
+              <p className="font-semibold text-ink">{t("auth.featureSecure")}</p>
+            </div>
+          </div>
         </section>
 
-        <section className="relative flex min-h-screen flex-col bg-paper px-5 py-5 sm:px-8 lg:px-10">
-          <div className="flex items-center justify-between gap-4 lg:justify-end">
-            <div className="flex items-center gap-3 lg:hidden">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rust text-white shadow-soft">
+        <section className="relative flex min-h-screen flex-col bg-[radial-gradient(circle_at_top_left,rgba(193,95,60,0.16),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.52),transparent_28%)] px-4 py-4 dark:bg-[radial-gradient(circle_at_top_left,rgba(212,120,84,0.17),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.04),transparent_28%)] sm:px-6 sm:py-5 lg:bg-paper lg:px-10 lg:py-5 lg:dark:bg-paper">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3 lg:hidden">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rust text-white shadow-soft sm:h-11 sm:w-11">
                 <Sparkles className="h-5 w-5" aria-hidden="true" />
               </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rust">{t("app.badge")}</p>
-                <p className="font-semibold text-ink">{t("app.title")}</p>
+              <div className="min-w-0">
+                <p className="truncate text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-rust sm:text-xs sm:tracking-[0.2em]">{t("app.badge")}</p>
+                <p className="truncate font-semibold text-ink">{t("app.title")}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <LanguageSwitcher />
-              <ThemeToggle />
+            <div className="flex shrink-0 items-center gap-2 lg:ml-auto">
+              <LanguageSwitcher compact />
+              <ThemeToggle compact />
             </div>
           </div>
 
-          <div className="flex flex-1 items-center justify-center py-10">
-            <div className="w-full max-w-md">{children}</div>
+          <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-7 sm:py-10 lg:max-w-md lg:py-10">
+            <div className="mb-5 rounded-[1.5rem] border border-line bg-surface/80 p-4 shadow-soft backdrop-blur lg:hidden">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rust/10 text-rust">
+                  <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <h1 className="font-serif text-2xl font-medium tracking-[-0.04em] text-ink">{t("app.heroTitle")}</h1>
+                  <p className="mt-2 text-sm leading-6 text-muted">{t("app.heroDescription")}</p>
+                </div>
+              </div>
+            </div>
+            {children}
           </div>
         </section>
       </div>

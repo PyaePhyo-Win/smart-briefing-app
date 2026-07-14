@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRight, LockKeyhole, Mail, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError, fetchCurrentUser, loginUser, registerUser } from "@/lib/api";
+import { useAuth } from "@/components/AuthProvider";
+import {
+  AUTH_SUCCESS_TRANSITION_DURATION_MS,
+  AUTH_SUCCESS_TRANSITION_STORAGE_KEY,
+  useAuthSuccessTransition,
+} from "@/components/AuthSuccessTransitionProvider";
+import { ApiError } from "@/lib/api";
 
 export type AuthMode = "login" | "register";
 
@@ -16,38 +22,18 @@ type AuthPageProps = {
 export function AuthPage({ mode }: AuthPageProps) {
   const router = useRouter();
   const { t } = useTranslation();
-  const [isInitializing, setIsInitializing] = useState(true);
+  const { user, isLoading, login, register } = useAuth();
+  const { isPlaying, playAuthSuccessTransition } = useAuthSuccessTransition();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const checkSession = async () => {
-      try {
-        const user = await fetchCurrentUser();
-        if (!isMounted) return;
-
-        if (user) {
-          router.replace("/");
-          return;
-        }
-      } catch (error) {
-        if (!isMounted) return;
-        setErrorMessage(error instanceof Error ? error.message : t("errors.backendUnreachable"));
-      } finally {
-        if (isMounted) setIsInitializing(false);
-      }
-    };
-
-    void checkSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [router, t]);
+    if (!isLoading && user && !isPlaying) {
+      router.replace("/");
+    }
+  }, [isLoading, isPlaying, router, user]);
 
   const handleSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -60,13 +46,17 @@ export function AuthPage({ mode }: AuthPageProps) {
       try {
         const normalizedEmail = email.trim().toLowerCase();
         if (mode === "login") {
-          await loginUser(normalizedEmail, password);
+          await login(normalizedEmail, password);
         } else {
-          await registerUser(normalizedEmail, password);
+          await register(normalizedEmail, password);
         }
 
         setPassword("");
-        router.replace("/");
+        playAuthSuccessTransition(mode);
+        window.sessionStorage.setItem(AUTH_SUCCESS_TRANSITION_STORAGE_KEY, mode);
+        window.setTimeout(() => {
+          router.replace("/");
+        }, AUTH_SUCCESS_TRANSITION_DURATION_MS);
       } catch (error) {
         if (error instanceof ApiError) {
           setErrorMessage(error.message);
@@ -77,7 +67,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         setIsSubmitting(false);
       }
     },
-    [email, mode, password, router, t]
+    [email, login, mode, password, playAuthSuccessTransition, register, router, t]
   );
 
   const submitLabel = mode === "login" ? t("auth.login") : t("auth.register");
@@ -97,7 +87,7 @@ export function AuthPage({ mode }: AuthPageProps) {
           {title}
         </h2>
         <p className="mt-3 text-sm leading-6 text-muted sm:text-base sm:leading-7">
-          {isInitializing ? t("auth.loading") : body}
+          {isLoading ? t("auth.loading") : body}
         </p>
       </div>
 
@@ -122,7 +112,7 @@ export function AuthPage({ mode }: AuthPageProps) {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               className="w-full rounded-2xl border border-line bg-paper py-3 pl-11 pr-4 text-base text-ink outline-none transition placeholder:text-muted/70 focus:border-rust focus:ring-4 focus:ring-rust/10 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
-              disabled={isInitializing || isSubmitting}
+              disabled={isLoading || isSubmitting || isPlaying}
               placeholder="you@example.com"
               required
             />
@@ -141,7 +131,7 @@ export function AuthPage({ mode }: AuthPageProps) {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               className="w-full rounded-2xl border border-line bg-paper py-3 pl-11 pr-4 text-base text-ink outline-none transition placeholder:text-muted/70 focus:border-rust focus:ring-4 focus:ring-rust/10 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
-              disabled={isInitializing || isSubmitting}
+              disabled={isLoading || isSubmitting || isPlaying}
               minLength={8}
               maxLength={1024}
               placeholder={t("auth.passwordPlaceholder")}
@@ -153,7 +143,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         <div className="space-y-4 pt-2">
           <button
             type="submit"
-            disabled={isInitializing || isSubmitting}
+            disabled={isLoading || isSubmitting || isPlaying}
             className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rust px-6 py-3 text-sm font-semibold text-white transition hover:bg-rust/90 focus:outline-none focus:ring-4 focus:ring-rust/20 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span>{isSubmitting ? t("auth.submitting") : submitLabel}</span>

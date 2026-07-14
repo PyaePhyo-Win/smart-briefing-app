@@ -2,48 +2,24 @@
 
 import { useRouter } from "next/navigation";
 import { ArrowLeft, LoaderCircle, Settings, ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { fetchCurrentUser } from "@/lib/api";
-import type { AuthUser } from "@/lib/types";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    let isMounted = true;
+    if (!isLoading && !user) {
+      router.replace("/login");
+    }
+  }, [isLoading, router, user]);
 
-    const checkSession = async () => {
-      try {
-        const currentUser = await fetchCurrentUser();
-        if (!isMounted) return;
-
-        if (!currentUser) {
-          router.replace("/login");
-          return;
-        }
-
-        setUser(currentUser);
-      } catch (error) {
-        if (!isMounted) return;
-        setErrorMessage(error instanceof Error ? error.message : t("errors.backendUnreachable"));
-      } finally {
-        if (isMounted) setIsInitializing(false);
-      }
-    };
-
-    void checkSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [router, t]);
+  const isInitializing = isLoading || !user;
 
   return (
     <main className="min-h-screen bg-paper text-ink">
@@ -95,8 +71,6 @@ export default function SettingsPage() {
               <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
               {t("settings.loading")}
             </div>
-          ) : errorMessage ? (
-            <p className="text-sm leading-6 text-red-700 dark:text-red-300">{errorMessage}</p>
           ) : (
             <dl className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-line bg-paper p-4">
@@ -104,7 +78,7 @@ export default function SettingsPage() {
                   {t("settings.email")}
                 </dt>
                 <dd className="mt-2 break-words text-sm font-semibold text-ink">
-                  {user?.email ?? t("settings.unavailable")}
+                  {user.email}
                 </dd>
               </div>
               <div className="rounded-2xl border border-line bg-paper p-4">
@@ -112,7 +86,7 @@ export default function SettingsPage() {
                   {t("settings.userId")}
                 </dt>
                 <dd className="mt-2 break-words text-sm font-semibold text-ink">
-                  {user?.id ?? t("settings.unavailable")}
+                  {user.id}
                 </dd>
               </div>
             </dl>

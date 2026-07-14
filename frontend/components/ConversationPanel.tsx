@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { Bot, Check, ClipboardCopy, FileText, FlaskConical, User } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { Bot, Check, ClipboardCopy, FlaskConical, User } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
@@ -16,6 +16,21 @@ export function ConversationPanel({ messages, isRunning }: Props) {
   const { t } = useTranslation();
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  const greeting = useMemo(() => {
+    const translatedGreetings = t("conversation.greetings", { returnObjects: true }) as unknown;
+    const greetings = Array.isArray(translatedGreetings)
+      ? translatedGreetings.filter(
+          (item): item is string => typeof item === "string" && item.trim().length > 0,
+        )
+      : [];
+
+    if (greetings.length === 0) {
+      return t("conversation.emptyTitle");
+    }
+
+    return greetings[Math.floor(Math.random() * greetings.length)];
+  }, [t]);
+
   const handleCopy = useCallback(async (message: ConversationMessage) => {
     if (!message.content) return;
     await navigator.clipboard.writeText(message.content);
@@ -25,16 +40,10 @@ export function ConversationPanel({ messages, isRunning }: Props) {
 
   if (messages.length === 0) {
     return (
-      <section className="mx-auto w-full max-w-4xl rounded-[2rem] border border-line bg-surface p-4 shadow-soft sm:p-6">
-        <div className="flex min-h-80 flex-col items-center justify-center rounded-[1.5rem] border border-line bg-paper/45 p-8 text-center">
-          <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full border border-line bg-surface text-rust">
-            <FileText className="h-6 w-6" aria-hidden="true" />
-          </div>
-          <h3 className="font-serif text-2xl text-ink">{t("conversation.emptyTitle")}</h3>
-          <p className="mt-3 max-w-md text-sm leading-6 text-muted">
-            {t("conversation.emptyBody")}
-          </p>
-        </div>
+      <section className="mx-auto flex w-full max-w-4xl flex-1 items-center justify-center px-2 py-10 text-center sm:px-4">
+        <h2 className="max-w-3xl font-serif text-4xl leading-tight text-ink sm:text-5xl md:text-6xl">
+          {greeting}
+        </h2>
       </section>
     );
   }

@@ -29,8 +29,12 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { ConversationComposer } from "@/components/ConversationComposer";
 import { ConversationPanel } from "@/components/ConversationPanel";
 import { ConversationHistorySidebar } from "@/components/ConversationHistorySidebar";
+import { useAuth } from "@/components/AuthProvider";
+import {
+  AUTH_SUCCESS_TRANSITION_DURATION_MS,
+  AUTH_SUCCESS_TRANSITION_STORAGE_KEY,
+} from "@/components/AuthSuccessTransitionProvider";
 import type {
-  AuthUser,
   ConversationHistoryItem,
   ConversationMessage,
   ConversationMode,
@@ -39,8 +43,6 @@ import type {
 import {
   fetchConversationDetail,
   fetchConversationSummaries,
-  fetchCurrentUser,
-  logoutUser,
 } from "@/lib/api";
 
 const SIDEBAR_STORAGE_KEY = "smart-briefing-agent-sidebar-width";
@@ -69,10 +71,10 @@ type WorkspacePageProps = {
 export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
   const router = useRouter();
   const { t } = useTranslation();
+  const { user: currentUser, isLoading: isAuthLoading, logout } = useAuth();
   const { status, logEntries, errorMessage, isRunning, submit, abort } = useResearchStream();
   const { isChatRunning, chatErrorMessage, submitChat, abortChat } = useChatStream();
   const [isInitializing, setIsInitializing] = useState(true);
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [uiErrorMessage, setUiErrorMessage] = useState<string | null>(null);
   const [mode, setMode] = useState<ConversationMode>("research");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -83,6 +85,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isMobileHistoryOpen, setIsMobileHistoryOpen] = useState(false);
+  const [shouldPlayAuthEntrance, setShouldPlayAuthEntrance] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const historyOpenButtonRef = useRef<HTMLButtonElement | null>(null);
   const workspaceOpenButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -123,20 +126,20 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
   }, []);
 
   const bootstrapWorkspace = useCallback(async () => {
+    if (isAuthLoading) return;
+
     setIsInitializing(true);
     setUiErrorMessage(null);
 
+    if (!currentUser) {
+      setConversationHistory([]);
+      resetConversationState();
+      router.replace("/login");
+      setIsInitializing(false);
+      return;
+    }
+
     try {
-      const user = await fetchCurrentUser();
-      setCurrentUser(user);
-
-      if (!user) {
-        setConversationHistory([]);
-        resetConversationState();
-        router.replace("/login");
-        return;
-      }
-
       const conversations = await loadConversationHistory();
       if (initialConversationId) {
         await loadConversation(initialConversationId);
@@ -150,11 +153,27 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
     } finally {
       setIsInitializing(false);
     }
-  }, [initialConversationId, loadConversation, loadConversationHistory, resetConversationState, router, t]);
+  }, [currentUser, initialConversationId, isAuthLoading, loadConversation, loadConversationHistory, resetConversationState, router, t]);
 
   useEffect(() => {
     void bootstrapWorkspace();
   }, [bootstrapWorkspace]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const transitionMode = window.sessionStorage.getItem(AUTH_SUCCESS_TRANSITION_STORAGE_KEY);
+    if (transitionMode !== "login" && transitionMode !== "register") return;
+
+    window.sessionStorage.removeItem(AUTH_SUCCESS_TRANSITION_STORAGE_KEY);
+    setShouldPlayAuthEntrance(true);
+
+    const timeoutId = window.setTimeout(() => {
+      setShouldPlayAuthEntrance(false);
+    }, AUTH_SUCCESS_TRANSITION_DURATION_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [currentUser]);
 
   useEffect(() => {
     const savedWidth = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
@@ -182,7 +201,10 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
 
   const isAnyRunning = isRunning || isChatRunning;
   const visibleError = uiErrorMessage ?? errorMessage ?? chatErrorMessage;
-  const showWorkspaceShell = Boolean(currentUser && !isInitializing);
+  const showWorkspaceShell = Boolean(currentUser && !isInitializing && !isAuthLoading);
+  const isEmptyWorkspace = Boolean(
+    currentUser && !isInitializing && !visibleError && messages.length === 0,
+  );
 
   const refreshConversationHistory = useCallback(
     async (preferredConversationId?: string | null) => {
@@ -233,16 +255,15 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
 
   const handleLogout = useCallback(async () => {
     try {
-      await logoutUser();
+      await logout();
     } catch (error) {
       setUiErrorMessage(error instanceof Error ? error.message : t("errors.backendUnreachable"));
     } finally {
-      setCurrentUser(null);
       setConversationHistory([]);
       resetConversationState();
       router.replace("/login");
     }
-  }, [resetConversationState, router, t]);
+  }, [logout, resetConversationState, router, t]);
 
   const handleConversationSubmit = useCallback(
     (nextMode: ConversationMode, value: string) => {
@@ -406,7 +427,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
   );
 
   return (
-    <main className="h-screen overflow-hidden bg-paper text-ink">
+    <main className={`h-screen overflow-hidden bg-paper text-ink${shouldPlayAuthEntrance ? " workspace-auth-success-enter" : ""}`}>
       <div className="flex h-full min-h-0">
         {showWorkspaceShell ? (
           <ConversationHistorySidebar
@@ -508,19 +529,11 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
 
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
-              <div className="mx-auto flex max-w-4xl flex-col gap-5 pb-8">
-                <div className="rounded-3xl border border-line bg-surface p-5 shadow-soft sm:p-7">
-                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-rust/20 bg-rust/5 px-3 py-1.5 text-xs font-medium text-rust">
-                    <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                    {t("app.badge")}
-                  </div>
-                  <h2 className="font-serif text-3xl font-medium tracking-[-0.04em] text-ink sm:text-4xl">
-                    {t("app.heroTitle")}
-                  </h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-muted sm:text-base">
-                    {t("app.heroDescription")}
-                  </p>
-                </div>
+              <div
+                className={`mx-auto flex max-w-4xl flex-col gap-5 pb-8 ${
+                  isEmptyWorkspace ? "min-h-full justify-center" : ""
+                }`}
+              >
 
                 {isInitializing ? (
                   <div className="rounded-3xl border border-line bg-surface p-6 shadow-soft">

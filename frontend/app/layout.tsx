@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Lora } from "next/font/google";
+import { AuthProvider } from "@/components/AuthProvider";
+import { AuthSuccessTransitionProvider } from "@/components/AuthSuccessTransitionProvider";
 import { I18nProvider } from "@/components/I18nProvider";
 import "./globals.css";
 
@@ -44,7 +46,11 @@ export default function RootLayout({
         className={`${inter.variable} ${lora.variable} font-sans bg-paper text-ink antialiased min-h-screen transition-colors duration-200`}
       >
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-        <I18nProvider>{children}</I18nProvider>
+        <I18nProvider>
+          <AuthSuccessTransitionProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </AuthSuccessTransitionProvider>
+        </I18nProvider>
       </body>
     </html>
   );

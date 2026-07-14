@@ -1,5 +1,14 @@
 import { AuthLayout } from "../../components/AuthLayout";
+import { AuthSuccessTransitionProvider } from "../../components/AuthSuccessTransitionProvider";
 
-export default function AuthRouteLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <AuthLayout>{children}</AuthLayout>;
+type LayoutProps = {
+  children: React.ReactNode;
+};
+
+export default function Layout({ children }: LayoutProps) {
+  return (
+    <AuthSuccessTransitionProvider>
+      <AuthLayout>{children}</AuthLayout>
+    </AuthSuccessTransitionProvider>
+  );
 }

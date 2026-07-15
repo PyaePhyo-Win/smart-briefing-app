@@ -1,17 +1,17 @@
 # Smart Briefing App
 
-AI-powered research briefing app with a decoupled FastAPI backend and Next.js frontend. The backend runs a CrewAI research workflow, searches the web with Serper or DuckDuckGo failover, stores users and conversations in PostgreSQL, indexes report chunks with Voyage AI embeddings in pgvector, and streams Gemini-polished Markdown plus follow-up chat responses to the UI in real time.
+AI-powered research briefing app with a decoupled FastAPI backend and Next.js frontend. The backend runs a CrewAI research workflow, searches the web with Serper or DuckDuckGo failover, stores users and conversations in PostgreSQL, indexes report chunks with Voyage AI embeddings in pgvector, compacts older chat turns into Gemini-generated conversation memory, and streams Gemini-polished Markdown plus follow-up chat responses to the UI in real time.
 
 ## Features
 
 - **Research generation** powered by CrewAI agents, Gemini, and live web search.
 - **Report polishing** with token-by-token Server-Sent Events (SSE) output.
-- **Chat over saved reports** with Voyage AI embeddings, pgvector retrieval, and Gemini responses.
-- **Persistent conversations** backed by PostgreSQL, including report/message history and vector chunks.
+- **Chat over saved reports or standalone conversations** with Voyage AI embeddings, pgvector retrieval, compressed conversation memory, and Gemini responses.
+- **Persistent conversations** backed by PostgreSQL, including report/message history, vector chunks, and compacted chat summaries.
 - **Email/password authentication** with HTTP-only database-backed session cookies.
 - **Credentialed security controls** including explicit CORS origins, unsafe-request origin checks, configurable trusted proxies, and endpoint rate limits.
 - **Search failover** from Serper to DuckDuckGo when keys or upstream results are unavailable.
-- **Next.js workspace UI** with authenticated routing, conversation history, settings/account page, responsive sidebars, theme toggle, and language switching.
+- **Next.js workspace UI** with authenticated routing, conversation history, settings/account page, responsive sidebars, theme toggle, language switching, and model selection.
 - **Docker Compose** setup for frontend, backend, PostgreSQL, and pgvector.
 
 ## Architecture
@@ -33,8 +33,10 @@ flowchart TD
   L --> M[PostgreSQL report + messages]
   M --> N[Voyage embeddings -> pgvector]
   B -->|POST /api/chat/stream| O[FastAPI chat SSE endpoint]
-  O --> P[RAG retrieval by user and conversation]
+  O --> P[RAG retrieval + chat summary + recent turns]
   P --> Q[Gemini follow-up answer]
+  Q --> R[Persist assistant response]
+  R --> S[Background chat compaction]
 ```
 
 ## Project Structure
@@ -48,7 +50,7 @@ flowchart TD
 │   ├── api/                     # Auth, conversations, research, chat routes and dependencies
 │   ├── agents/                  # CrewAI agent definitions and runner
 │   ├── db/                      # SQLAlchemy models and session setup
-│   ├── services/                # Auth, chat, RAG, polishing, streaming helpers
+│   ├── services/                # Auth, chat, compaction, RAG, polishing, streaming helpers
 │   └── tools/                   # Unified search tool with Serper/DuckDuckGo fallback
 ├── frontend/
 │   ├── app/
@@ -259,14 +261,17 @@ The backend creates the conversation before running research. If the request dis
 Body:
 
 ```json
-{ "conversation_id": "uuid", "message": "Follow-up question", "model": "gemini-3.5-flash" }
+{ "conversation_id": "uuid-or-null", "message": "Follow-up question", "model": "gemini-3.5-flash" }
 ```
+
+`conversation_id` is optional. When omitted or `null`, the backend creates a new chat-only conversation titled from the message. When provided, it must belong to the authenticated user.
 
 `model` is optional and controls direct Gemini chat responses. If omitted, the backend uses `CHAT_MODEL`. Supported values are `gemini-3.5-flash`, `gemini-3.1-flash-lite`, `gemini-2.5-flash`, and `gemini-2.5-flash-lite`.
 
 Validation and limits:
 
-- Requires authentication and ownership of the conversation.
+- Requires authentication.
+- Provided `conversation_id` values require ownership of the conversation.
 - `message` is trimmed and must be 1-2000 characters.
 - Rate limit: 12 requests per 300 seconds per client/scope.
 
@@ -281,8 +286,9 @@ Response: `text/event-stream` with:
 - Unauthenticated users are redirected to `/login`.
 - Login and registration share the `(auth)` route group and `AuthLayout` split-screen shell.
 - Auth pages include language and theme controls plus the `/images/auth-image.png` hero asset.
-- The workspace loads the signed-in user, conversation summaries, and either the requested `/conversations/[id]` conversation, the most recent conversation, or a blank state.
-- Research mode creates a saved conversation and report; chat mode appears after a report exists for the active conversation.
+- The workspace loads the signed-in user, conversation summaries, and either the requested `/conversations/[id]` conversation or a blank state.
+- Research mode creates a saved conversation and report; chat mode can continue the active conversation or create a new chat-only conversation.
+- The composer supports model selection for research polish and chat responses.
 - The conversation sidebar is collapsible/resizable on desktop and opens as an accessible mobile panel on small screens.
 - The workspace header exposes language switching, theme toggling, settings, and logout.
 - `/settings` verifies the session and displays account details for the current user.
@@ -290,6 +296,7 @@ Response: `text/event-stream` with:
 ## Notes
 
 - Keep `VOYAGE_EMBEDDING_DIMENSION=1024` unless you also create a matching database migration.
+- Follow-up chat uses the latest raw chat turns plus compressed conversation memory once older chat messages exceed the backend sliding window.
 - Do not use `ALLOWED_ORIGINS=*`; credentialed CORS and CSRF origin validation require explicit origins.
 - If deploying cross-site cookies with `SESSION_COOKIE_SAMESITE=none`, set `SESSION_COOKIE_SECURE=true` and serve over HTTPS.
 - Add real secrets only to local environment files or deployment secret stores. Do not commit `.env` files.

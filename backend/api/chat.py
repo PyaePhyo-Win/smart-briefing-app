@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from api.deps import get_current_user, rate_limit, validate_csrf_origin
+from config import validate_gemini_model
 from db.models import Conversation, Message, User, utc_now
 from db.session import get_db
 from services.chat import MAX_HISTORY_MESSAGES, stream_chat
@@ -23,6 +24,7 @@ router = APIRouter()
 class ChatRequest(BaseModel):
     conversation_id: UUID | None = None
     message: str
+    model: str | None = None
 
     @field_validator("message")
     @classmethod
@@ -33,6 +35,14 @@ class ChatRequest(BaseModel):
         if len(value) > 2000:
             raise ValueError("Message must be under 2000 characters")
         return value
+
+    @field_validator("model")
+    @classmethod
+    def validate_model(cls, value: str | None) -> str | None:
+        try:
+            return validate_gemini_model(value)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
 
 
 def _sse(event_type: str, **data) -> str:
@@ -84,7 +94,7 @@ async def chat_stream(
     async def event_stream():
         assistant_parts: list[str] = []
         try:
-            async for text_chunk in stream_chat(req.message, history, context_chunks, chat_summary):
+            async for text_chunk in stream_chat(req.message, history, context_chunks, chat_summary, model=req.model):
                 if await request.is_disconnected():
                     return
                 assistant_parts.append(text_chunk)

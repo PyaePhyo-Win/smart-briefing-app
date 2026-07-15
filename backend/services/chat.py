@@ -90,10 +90,11 @@ async def stream_chat(
     history: list[dict[str, str]],
     context_chunks: list[str],
     chat_summary: str = "",
+    model: str | None = None,
 ) -> AsyncIterator[str]:
     """Yield text chunks from Gemini direct chat streaming."""
     response = await _client.aio.models.generate_content_stream(
-        model=settings.chat_model,
+        model=model or settings.chat_model,
         contents=build_chat_prompt(message, history, context_chunks, chat_summary),
     )
     async for chunk in response:

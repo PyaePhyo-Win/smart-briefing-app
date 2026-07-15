@@ -3,11 +3,26 @@
 import { FormEvent, useState } from "react";
 import { Bot, FlaskConical, Send, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { ConversationMode } from "@/lib/types";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  GEMINI_MODEL_OPTIONS,
+  type ConversationMode,
+  type GeminiModelId,
+} from "@/lib/types";
 
 interface Props {
   mode: ConversationMode;
   onModeChange: (mode: ConversationMode) => void;
+  selectedModel: GeminiModelId;
+  onModelChange: (model: GeminiModelId) => void;
   onSubmit: (mode: ConversationMode, value: string) => void;
   onAbort: () => void;
   isRunning: boolean;
@@ -27,6 +42,8 @@ const MODE_CONFIG: Record<ConversationMode, { maxLength: number }> = {
 export function ConversationComposer({
   mode,
   onModeChange,
+  selectedModel,
+  onModelChange,
   onSubmit,
   onAbort,
   isRunning,
@@ -81,6 +98,34 @@ export function ConversationComposer({
               </button>
             );
           })}
+
+          <div className="flex flex-1 flex-col gap-1 sm:ml-auto max-w-[175px]">
+            <label id="gemini-model-label" className="px-1 text-xs font-semibold text-muted">
+              {t("composer.modelLabel")}
+            </label>
+            <Select
+              value={selectedModel}
+              onValueChange={(model) => onModelChange(model as GeminiModelId)}
+              disabled={isRunning}
+            >
+              <SelectTrigger
+                aria-labelledby="gemini-model-label"
+                className="h-9 bg-paper/60 text-xs"
+              >
+                <SelectValue placeholder={t("composer.modelPlaceholder")} />
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectGroup>
+                  <SelectLabel>{t("composer.modelLabel")}</SelectLabel>
+                  {GEMINI_MODEL_OPTIONS.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">

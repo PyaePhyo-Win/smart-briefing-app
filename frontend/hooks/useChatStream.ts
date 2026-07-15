@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ChatSSEEvent } from "@/lib/types";
+import type { ChatSSEEvent, GeminiModelId } from "@/lib/types";
 import { readErrorMessage } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -10,6 +10,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 type SubmitChatArgs = {
   conversationId?: string | null;
   message: string;
+  model: GeminiModelId;
   onToken: (text: string) => void;
   onDone: (conversationId?: string) => void;
   onError: (message: string) => void;
@@ -22,7 +23,7 @@ export function useChatStream() {
   const abortRef = useRef<AbortController | null>(null);
 
   const submitChat = useCallback(
-    async ({ conversationId, message, onToken, onDone, onError }: SubmitChatArgs) => {
+    async ({ conversationId, message, model, onToken, onDone, onError }: SubmitChatArgs) => {
       if (!message.trim()) return;
 
       const controller = new AbortController();
@@ -38,6 +39,7 @@ export function useChatStream() {
           body: JSON.stringify({
             conversation_id: conversationId ?? null,
             message: message.trim(),
+            model,
           }),
           signal: controller.signal,
         });

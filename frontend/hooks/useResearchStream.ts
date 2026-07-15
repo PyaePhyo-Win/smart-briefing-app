@@ -1,10 +1,22 @@
 "use client";
 import { useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import type { LogEntry, AppStatus, SSEEvent } from "@/lib/types";
+import type { LogEntry, AppStatus, GeminiModelId, SSEEvent } from "@/lib/types";
 import { readErrorMessage } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+type SubmitResearchCallbacks = {
+  onToken?: (text: string) => void;
+  onDone?: (conversationId: string | null) => void;
+  onError?: (message: string) => void;
+};
+
+type SubmitResearchArgs = {
+  topic: string;
+  model: GeminiModelId;
+  callbacks?: SubmitResearchCallbacks;
+};
 
 export function useResearchStream() {
   const { t } = useTranslation();
@@ -28,14 +40,7 @@ export function useResearchStream() {
   }, []);
 
   const submit = useCallback(
-    async (
-      topic: string,
-      callbacks?: {
-        onToken?: (text: string) => void;
-        onDone?: (conversationId: string | null) => void;
-        onError?: (message: string) => void;
-      }
-    ) => {
+    async ({ topic, model, callbacks }: SubmitResearchArgs) => {
       if (!topic.trim()) return;
       reset();
 
@@ -47,7 +52,10 @@ export function useResearchStream() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ topic: topic.trim() }),
+          body: JSON.stringify({
+            topic: topic.trim(),
+            model,
+          }),
           signal: controller.signal,
         });
 

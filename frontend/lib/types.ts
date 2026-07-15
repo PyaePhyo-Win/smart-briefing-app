@@ -13,6 +13,17 @@ export type SSEEvent = LogEvent | TokenEvent | ErrorEvent | DoneEvent;
 export type ChatSSEEvent = TokenEvent | ErrorEvent | DoneEvent;
 
 export type ConversationMode = "research" | "chat";
+export type GeminiModelId = "gemini-3.5-flash" | "gemini-3.1-flash-lite" | "gemini-2.5-flash" | "gemini-2.5-flash-lite";
+
+export const DEFAULT_GEMINI_MODEL: GeminiModelId = "gemini-3.5-flash";
+
+export const GEMINI_MODEL_OPTIONS: { id: GeminiModelId; label: string }[] = [
+  { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash" },
+  { id: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" },
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite" },
+];
+
 export type ConversationRole = "user" | "assistant";
 export type ConversationMessageStatus = "streaming" | "done" | "error";
 export type ConversationMessageKind = "research" | "chat" | "research_report";

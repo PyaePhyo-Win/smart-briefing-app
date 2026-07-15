@@ -3,14 +3,27 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 EMBEDDING_DIMENSION = 1024
+SUPPORTED_GEMINI_MODELS = ("gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite")
+
+
+def validate_gemini_model(model: str | None) -> str | None:
+    if model is None:
+        return None
+    model = model.strip()
+    if not model:
+        return None
+    if model not in SUPPORTED_GEMINI_MODELS:
+        supported = ", ".join(SUPPORTED_GEMINI_MODELS)
+        raise ValueError(f"Unsupported Gemini model '{model}'. Supported models: {supported}")
+    return model
 
 
 class Settings(BaseSettings):
     gemini_api_key: str = ""
     serper_api_key: str = ""
     crew_llm: str = "gemini/gemini-2.5-flash"
-    polish_model: str = "gemini-2.5-flash"
-    chat_model: str = "gemini-2.5-flash"
+    polish_model: str = "gemini-3.5-flash"
+    chat_model: str = "gemini-3.5-flash"
     allowed_origins: str = "http://localhost:3000"
     max_crew_workers: int = 4
     log_level: str = "INFO"
@@ -48,6 +61,8 @@ class Settings(BaseSettings):
             raise ValueError("VOYAGE_API_KEY is required. Set it in backend/.env or the environment.")
         if self.rate_limit_max_keys < 1:
             raise ValueError("RATE_LIMIT_MAX_KEYS must be at least 1")
+        validate_gemini_model(self.polish_model)
+        validate_gemini_model(self.chat_model)
 
         self.session_cookie_samesite = self.session_cookie_samesite.lower()
         if self.session_cookie_samesite not in {"lax", "strict", "none"}:

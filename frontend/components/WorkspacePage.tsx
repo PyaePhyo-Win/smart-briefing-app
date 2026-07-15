@@ -34,11 +34,13 @@ import {
   AUTH_SUCCESS_TRANSITION_DURATION_MS,
   AUTH_SUCCESS_TRANSITION_STORAGE_KEY,
 } from "@/components/AuthSuccessTransitionProvider";
-import type {
-  ConversationHistoryItem,
-  ConversationMessage,
-  ConversationMode,
-  PersistedConversation,
+import {
+  DEFAULT_GEMINI_MODEL,
+  type ConversationHistoryItem,
+  type ConversationMessage,
+  type ConversationMode,
+  type GeminiModelId,
+  type PersistedConversation,
 } from "@/lib/types";
 import {
   fetchConversationDetail,
@@ -77,6 +79,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [uiErrorMessage, setUiErrorMessage] = useState<string | null>(null);
   const [mode, setMode] = useState<ConversationMode>("research");
+  const [selectedModel, setSelectedModel] = useState<GeminiModelId>(DEFAULT_GEMINI_MODEL);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [conversationHistory, setConversationHistory] = useState<ConversationHistoryItem[]>([]);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
@@ -140,13 +143,12 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
     }
 
     try {
-      const conversations = await loadConversationHistory();
+      await loadConversationHistory();
       if (initialConversationId) {
         await loadConversation(initialConversationId);
-      } else if (conversations.length > 0) {
-        await loadConversation(conversations[0].id);
       } else {
         resetConversationState();
+        router.replace("/");
       }
     } catch (error) {
       setUiErrorMessage(error instanceof Error ? error.message : t("errors.backendUnreachable"));
@@ -211,18 +213,14 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
       const conversations = await loadConversationHistory();
       const nextId = preferredConversationId ?? activeConversationId;
 
-      if (!conversations.length) {
-        resetConversationState();
-        router.replace("/");
+      if (nextId && conversations.some((conversation) => conversation.id === nextId)) {
         return;
       }
 
-      if (!nextId || !conversations.some((conversation) => conversation.id === nextId)) {
-        const conversation = await loadConversation(conversations[0].id);
-        router.replace(`/conversations/${conversation.id}`);
-      }
+      resetConversationState();
+      router.replace("/");
     },
-    [activeConversationId, loadConversation, loadConversationHistory, resetConversationState, router]
+    [activeConversationId, loadConversationHistory, resetConversationState, router]
   );
 
   const toggleSidebar = useCallback(() => {
@@ -294,58 +292,65 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
         router.replace("/");
         let reportDraft = "";
 
-        void submit(value, {
-          onToken: (text) => {
-            reportDraft += text;
-            setMessages((current) =>
-              updateMessage(current, assistantId, (message) => ({
-                ...message,
-                content: message.content + text,
-              }))
-            );
-          },
-          onDone: async (conversationId) => {
-            setLatestReport(reportDraft);
-            setMessages((current) =>
-              updateMessage(current, assistantId, (message) => ({
-                ...message,
-                status: "done",
-              }))
-            );
-            if (!conversationId) {
-              setUiErrorMessage(t("errors.backendUnreachable"));
-              return;
-            }
+        void submit({
+          topic: value,
+          model: selectedModel,
+          callbacks: {
+            onToken: (text) => {
+              reportDraft += text;
+              setMessages((current) =>
+                updateMessage(current, assistantId, (message) => ({
+                  ...message,
+                  content: message.content + text,
+                }))
+              );
+            },
+            onDone: async (conversationId) => {
+              setLatestReport(reportDraft);
+              setMessages((current) =>
+                updateMessage(current, assistantId, (message) => ({
+                  ...message,
+                  status: "done",
+                }))
+              );
+              if (!conversationId) {
+                setUiErrorMessage(t("errors.backendUnreachable"));
+                return;
+              }
 
-            try {
-              await refreshConversationHistory(conversationId);
-              await loadConversation(conversationId);
-              setMode("chat");
-              router.replace(`/conversations/${conversationId}`);
-            } catch (error) {
-              setUiErrorMessage(error instanceof Error ? error.message : t("errors.backendUnreachable"));
-            }
-          },
-          onError: (message) => {
-            setMessages((current) =>
-              updateMessage(current, assistantId, (item) => ({
-                ...item,
-                content: item.content || message,
-                status: "error",
-              }))
-            );
+              try {
+                await refreshConversationHistory(conversationId);
+                await loadConversation(conversationId);
+                setMode("chat");
+                router.replace(`/conversations/${conversationId}`);
+              } catch (error) {
+                setUiErrorMessage(error instanceof Error ? error.message : t("errors.backendUnreachable"));
+              }
+            },
+            onError: (message) => {
+              setMessages((current) =>
+                updateMessage(current, assistantId, (item) => ({
+                  ...item,
+                  content: item.content || message,
+                  status: "error",
+                }))
+              );
+            },
           },
         });
         return;
       }
 
-      const nextMessages = activeConversationId ? [...messages, userMessage, assistantMessage] : [userMessage, assistantMessage];
+      const nextMessages = activeConversationId
+        ? [...messages, userMessage, assistantMessage]
+        : [userMessage, assistantMessage];
       setMessages(nextMessages);
       setMode("chat");
 
       void submitChat({
         conversationId: activeConversationId,
         message: value,
+        model: selectedModel,
         onToken: (text) => {
           setMessages((current) =>
             updateMessage(current, assistantId, (message) => ({
@@ -388,7 +393,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
         },
       });
     },
-    [activeConversationId, loadConversation, messages, refreshConversationHistory, router, submit, submitChat, t]
+    [activeConversationId, loadConversation, messages, refreshConversationHistory, router, selectedModel, submit, submitChat, t]
   );
 
   const handleAbort = useCallback(() => {
@@ -564,6 +569,8 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
                   <ConversationComposer
                     mode={mode}
                     onModeChange={setMode}
+                    selectedModel={selectedModel}
+                    onModelChange={setSelectedModel}
                     onSubmit={handleConversationSubmit}
                     onAbort={handleAbort}
                     isRunning={isAnyRunning}

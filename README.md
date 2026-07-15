@@ -87,8 +87,8 @@ VOYAGE_API_KEY=your_voyage_api_key
 SERPER_API_KEY=your_serper_api_key_optional
 DATABASE_URL=postgresql+psycopg://smart_briefing:smart_briefing@localhost:5432/smart_briefing
 CREW_LLM=gemini/gemini-2.5-flash
-POLISH_MODEL=gemini-2.5-flash
-CHAT_MODEL=gemini-2.5-flash
+POLISH_MODEL=gemini-3.5-flash
+CHAT_MODEL=gemini-3.5-flash
 ALLOWED_ORIGINS=http://localhost:3000
 MAX_CREW_WORKERS=4
 LOG_LEVEL=INFO
@@ -120,8 +120,8 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 | `SERPER_API_KEY` | No | - | Enables Serper search before falling back to DuckDuckGo. |
 | `DATABASE_URL` | No | `postgresql+psycopg://smart_briefing:smart_briefing@localhost:5432/smart_briefing` | SQLAlchemy/PostgreSQL connection string. |
 | `CREW_LLM` | No | `gemini/gemini-2.5-flash` | CrewAI model identifier. |
-| `POLISH_MODEL` | No | `gemini-2.5-flash` | Gemini model used for report polish streaming. |
-| `CHAT_MODEL` | No | `gemini-2.5-flash` | Gemini model used for follow-up chat. |
+| `POLISH_MODEL` | No | `gemini-3.5-flash` | Default Gemini model used for report polish streaming. Supported request overrides: `gemini-3.5-flash`, `gemini-3.1-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`. |
+| `CHAT_MODEL` | No | `gemini-3.5-flash` | Default Gemini model used for follow-up chat. Supported request overrides: `gemini-3.5-flash`, `gemini-3.1-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`. |
 | `ALLOWED_ORIGINS` | No | `http://localhost:3000` | Comma-separated credentialed CORS origins. Wildcard `*` is rejected. |
 | `MAX_CREW_WORKERS` | No | `4` | Thread pool size for concurrent CrewAI runs. |
 | `LOG_LEVEL` | No | `INFO` | Backend logging level. |
@@ -230,8 +230,10 @@ All authenticated browser requests use credentials and an HTTP-only session cook
 Body:
 
 ```json
-{ "topic": "AI adoption in healthcare" }
+{ "topic": "AI adoption in healthcare", "model": "gemini-3.5-flash" }
 ```
+
+`model` is optional and controls report polishing only. If omitted, the backend uses `POLISH_MODEL`. Supported values are `gemini-3.5-flash`, `gemini-3.1-flash-lite`, `gemini-2.5-flash`, and `gemini-2.5-flash-lite`.
 
 Validation and limits:
 
@@ -257,8 +259,10 @@ The backend creates the conversation before running research. If the request dis
 Body:
 
 ```json
-{ "conversation_id": "uuid", "message": "Follow-up question" }
+{ "conversation_id": "uuid", "message": "Follow-up question", "model": "gemini-3.5-flash" }
 ```
+
+`model` is optional and controls direct Gemini chat responses. If omitted, the backend uses `CHAT_MODEL`. Supported values are `gemini-3.5-flash`, `gemini-3.1-flash-lite`, `gemini-2.5-flash`, and `gemini-2.5-flash-lite`.
 
 Validation and limits:
 

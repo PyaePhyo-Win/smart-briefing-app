@@ -17,10 +17,10 @@ POLISH_PROMPT = (
 )
 
 
-def stream_polish(raw_report: str):
+def stream_polish(raw_report: str, model: str | None = None):
     """Yield text chunks from Gemini polish streaming."""
     response = _client.models.generate_content_stream(
-        model=settings.polish_model,
+        model=model or settings.polish_model,
         contents=POLISH_PROMPT.format(report=raw_report),
     )
     for chunk in response:

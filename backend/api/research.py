@@ -3,7 +3,6 @@ import json
 import logging
 import queue as q
 from collections.abc import AsyncIterator
-
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
@@ -11,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from agents.crew_runner import get_executor, run_crew
 from api.deps import get_current_user, rate_limit, validate_csrf_origin
+from config import validate_gemini_model
 from db.models import Conversation, Message, Report, User, utc_now
 from db.session import get_db
 from services.polish import stream_polish
@@ -23,6 +23,7 @@ router = APIRouter(prefix="/api/research", tags=["research"])
 
 class ResearchRequest(BaseModel):
     topic: str
+    model: str | None = None
 
     @field_validator("topic")
     @classmethod
@@ -33,6 +34,14 @@ class ResearchRequest(BaseModel):
         if len(v) > 300:
             raise ValueError("Topic must be under 300 characters")
         return v
+
+    @field_validator("model")
+    @classmethod
+    def validate_model(cls, value: str | None) -> str | None:
+        try:
+            return validate_gemini_model(value)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
 
 
 def _sse(event_type: str, **data) -> str:
@@ -51,9 +60,11 @@ async def research_stream(
     current_user: User = Depends(get_current_user),
 ):
     topic = request.topic
+    selected_model = request.model
     conversation = Conversation(user_id=current_user.id, title=topic[:120])
     db.add(conversation)
     db.flush()
+
     db.add(Message(user_id=current_user.id, conversation_id=conversation.id, role="user", kind="research", content=topic))
     conversation.updated_at = utc_now()
     db.commit()
@@ -120,7 +131,7 @@ async def research_stream(
 
         polished_parts: list[str] = []
         try:
-            for text_chunk in stream_polish(raw_report):
+            for text_chunk in stream_polish(raw_report, model=selected_model):
                 if await _request.is_disconnected():
                     logger.info("Client disconnected during report polishing for conversation %s", conversation_id)
                     cleanup_incomplete_conversation("client disconnect during polishing")

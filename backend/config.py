@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     session_cookie_samesite: str = "lax"
     session_expire_days: int = 30
 
+    object_storage_endpoint: str = "http://localhost:9000"
+    object_storage_public_url: str = "http://localhost:9000"
+    object_storage_bucket: str = "profile-photos"
+    object_storage_access_key: str = "minioadmin"
+    object_storage_secret_key: str = "minioadmin"
+    object_storage_region: str = "us-east-1"
+    profile_upload_max_bytes: int = 5 * 1024 * 1024
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @property
@@ -75,6 +83,8 @@ class Settings(BaseSettings):
             raise ValueError(f"VOYAGE_EMBEDDING_DIMENSION must be {EMBEDDING_DIMENSION} to match the database schema")
         if self.rag_chunk_overlap >= self.rag_chunk_size:
             raise ValueError("RAG_CHUNK_OVERLAP must be smaller than RAG_CHUNK_SIZE")
+        if self.profile_upload_max_bytes < 1:
+            raise ValueError("PROFILE_UPLOAD_MAX_BYTES must be at least 1")
         return self
 
 

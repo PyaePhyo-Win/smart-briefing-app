@@ -33,9 +33,13 @@ export function ConversationPanel({ messages, isRunning }: Props) {
 
   const handleCopy = useCallback(async (message: ConversationMessage) => {
     if (!message.content) return;
-    await navigator.clipboard.writeText(message.content);
-    setCopiedId(message.id);
-    setTimeout(() => setCopiedId(null), 2000);
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopiedId(message.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      setCopiedId(null);
+    }
   }, []);
 
   if (messages.length === 0) {

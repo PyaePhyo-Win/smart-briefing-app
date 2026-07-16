@@ -58,8 +58,8 @@ export function ThemeToggle({ compact = false }: ThemeToggleProps) {
       })}
       aria-pressed={isDark}
       className={cn(
-        "inline-flex h-11 items-center gap-2 rounded-full border border-line bg-surface px-3.5 text-sm font-medium text-muted shadow-soft transition duration-200 hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10",
-        compact && "h-10 px-3 sm:h-11 sm:px-3.5",
+        "inline-flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface text-sm font-medium text-muted shadow-soft transition duration-200 hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10",
+        compact && "h-10 w-10 sm:h-11 sm:w-11",
       )}
     >
       {mounted && isDark ? (
@@ -67,9 +67,6 @@ export function ThemeToggle({ compact = false }: ThemeToggleProps) {
       ) : (
         <Moon className="h-4 w-4 shrink-0" aria-hidden="true" />
       )}
-      <span className={cn(compact && "sr-only sm:not-sr-only")}>
-        {mounted && isDark ? t("theme.light") : t("theme.dark")}
-      </span>
     </button>
   );
 }

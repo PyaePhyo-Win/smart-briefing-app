@@ -9,8 +9,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuthSuccessTransition } from "@/components/AuthSuccessTransitionProvider";
 
 type AuthLayoutProps = {
@@ -86,10 +84,6 @@ export function AuthLayout({ children }: AuthLayoutProps) {
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2 lg:ml-auto">
-              <LanguageSwitcher compact />
-              <ThemeToggle compact />
-            </div>
           </div>
 
           <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-7 sm:py-10 lg:max-w-md lg:py-10">

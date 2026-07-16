@@ -16,6 +16,7 @@ type AuthContextValue = {
   user: AuthUser | null;
   isLoading: boolean;
   refreshUser: () => Promise<AuthUser | null>;
+  setAuthUser: (user: AuthUser | null) => void;
   login: (email: string, password: string) => Promise<AuthUser>;
   register: (email: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
@@ -51,18 +52,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(initialUser);
   const [isLoading, setIsLoading] = useState(!hasLoadedInitialUser);
 
+  const setAuthUser = useCallback((nextUser: AuthUser | null) => {
+    initialUser = nextUser;
+    hasLoadedInitialUser = true;
+    setUser(nextUser);
+  }, []);
+
   const refreshUser = useCallback(async () => {
     setIsLoading(true);
     try {
       const currentUser = await fetchCurrentUser();
-      initialUser = currentUser;
-      hasLoadedInitialUser = true;
-      setUser(currentUser);
+      setAuthUser(currentUser);
       return currentUser;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [setAuthUser]);
 
   useEffect(() => {
     let isMounted = true;
@@ -96,19 +101,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = useCallback(async (email: string, password: string) => {
     const authenticatedUser = await loginUser(email, password);
-    initialUser = authenticatedUser;
-    hasLoadedInitialUser = true;
-    setUser(authenticatedUser);
+    setAuthUser(authenticatedUser);
     return authenticatedUser;
-  }, []);
+  }, [setAuthUser]);
 
   const register = useCallback(async (email: string, password: string) => {
     const authenticatedUser = await registerUser(email, password);
-    initialUser = authenticatedUser;
-    hasLoadedInitialUser = true;
-    setUser(authenticatedUser);
+    setAuthUser(authenticatedUser);
     return authenticatedUser;
-  }, []);
+  }, [setAuthUser]);
 
   const logout = useCallback(async () => {
     try {
@@ -122,8 +123,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, isLoading, refreshUser, login, register, logout }),
-    [user, isLoading, refreshUser, login, register, logout]
+    () => ({ user, isLoading, refreshUser, setAuthUser, login, register, logout }),
+    [user, isLoading, refreshUser, setAuthUser, login, register, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

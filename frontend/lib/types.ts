@@ -65,6 +65,12 @@ export type ActiveConversation = {
 export type AuthUser = {
   id: string;
   email: string;
+  username: string;
+  display_name: string | null;
+  profile_image_url: string | null;
+  plan: string;
+  subscription_status: string;
+  subscription_current_period_end: string | null;
 };
 
 export type LogEntry = {

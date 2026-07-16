@@ -9,6 +9,11 @@ import type {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+export type ProfileUpdatePayload = {
+  username?: string;
+  display_name?: string | null;
+};
+
 type BackendConversationSummary = {
   id: string;
   title: string | null;
@@ -70,13 +75,17 @@ export async function readErrorMessage(response: Response): Promise<string> {
 
 async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T | null> {
   const { allowUnauthorized = false, headers, ...init } = options;
+  const isFormData = init.body instanceof FormData;
+  const requestHeaders = new Headers(headers);
+
+  if (!isFormData && !requestHeaders.has("Content-Type")) {
+    requestHeaders.set("Content-Type", "application/json");
+  }
+
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...headers,
-    },
+    headers: requestHeaders,
   });
 
   if (allowUnauthorized && response.status === 401) {
@@ -143,6 +152,32 @@ export async function logoutUser(): Promise<void> {
   await apiRequest("/api/auth/logout", {
     method: "POST",
   });
+}
+
+export async function updateUserProfile(payload: ProfileUpdatePayload): Promise<AuthUser> {
+  const response = await apiRequest<AuthUser>("/api/auth/me/profile", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  return response as AuthUser;
+}
+
+export async function uploadProfilePhoto(file: File): Promise<AuthUser> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await apiRequest<AuthUser>("/api/auth/me/profile-photo", {
+    method: "POST",
+    body: formData,
+  });
+  return response as AuthUser;
+}
+
+export async function deleteProfilePhoto(): Promise<AuthUser> {
+  const response = await apiRequest<AuthUser>("/api/auth/me/profile-photo", {
+    method: "DELETE",
+  });
+  return response as AuthUser;
 }
 
 export async function fetchConversationSummaries(): Promise<ConversationHistoryItem[]> {

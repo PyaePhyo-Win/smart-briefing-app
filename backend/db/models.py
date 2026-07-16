@@ -21,7 +21,18 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
+    username: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    profile_image_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    profile_image_object_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    profile_image_content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    profile_image_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    plan: Mapped[str] = mapped_column(String(32), default="free", nullable=False)
+    subscription_status: Mapped[str] = mapped_column(String(32), default="inactive", nullable=False)
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    subscription_current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False

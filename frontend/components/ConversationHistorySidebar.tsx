@@ -1,6 +1,7 @@
 "use client";
 
-import { MessageSquare, PanelLeftClose, Plus, Search } from "lucide-react";
+import Image from "next/image";
+import { LogOut, MessageSquare, PanelLeftClose, Plus, Search, Settings, UserCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { formatLocalDateTime } from "@/lib/dateTime";
@@ -12,6 +13,10 @@ type ConversationHistorySidebarProps = {
   activeConversationId: string | null;
   onNewConversation: () => void;
   onSelectConversation: (conversation: ConversationHistoryItem) => void;
+  userDisplayName?: string;
+  userImageUrl?: string;
+  onOpenSettings?: () => void;
+  onSignOut?: () => void;
   onCloseMobile?: () => void;
   className?: string;
 };
@@ -24,10 +29,15 @@ export function ConversationHistorySidebar({
   activeConversationId,
   onNewConversation,
   onSelectConversation,
+  userDisplayName,
+  userImageUrl,
+  onOpenSettings,
+  onSignOut,
   onCloseMobile,
   className,
 }: ConversationHistorySidebarProps) {
   const { t } = useTranslation();
+  const identityLabel = userDisplayName || t("settings.unavailable");
 
   return (
     <aside
@@ -122,6 +132,53 @@ export function ConversationHistorySidebar({
           </nav>
         )}
       </div>
+
+      {(userDisplayName || onOpenSettings || onSignOut) ? (
+        <div className="shrink-0 border-t border-line p-3">
+          {onOpenSettings ? (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="flex w-full items-center gap-2 rounded-2xl border border-line bg-paper px-4 py-3 text-sm font-semibold text-muted transition hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10"
+            >
+              <Settings className="h-4 w-4" aria-hidden="true" />
+              <span>{t("settings.title")}</span>
+            </button>
+          ) : null}
+
+          {userDisplayName ? (
+            <div className="mt-3 flex min-w-0 items-center gap-3 rounded-2xl border border-line bg-paper/70 px-3 py-2 text-sm text-muted">
+              {userImageUrl ? (
+                <Image
+                  src={userImageUrl}
+                  alt={t("settings.avatarAlt", { name: identityLabel })}
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 shrink-0 rounded-full border border-line object-cover"
+                />
+              ) : (
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-rust">
+                  <UserCircle className="h-5 w-5" aria-hidden="true" />
+                </span>
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-semibold text-ink">{identityLabel}</span>
+              </span>
+            </div>
+          ) : null}
+
+          {onSignOut ? (
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold text-muted transition hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              <span>{t("header.signOut")}</span>
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </aside>
   );
 }

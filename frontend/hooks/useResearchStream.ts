@@ -39,6 +39,14 @@ export function useResearchStream() {
     logIdRef.current = 0;
   }, []);
 
+  const clear = useCallback(() => {
+    setStatus("idle");
+    setErrorMessage(null);
+    setReport("");
+    setLogEntries([]);
+    logIdRef.current = 0;
+  }, []);
+
   const submit = useCallback(
     async ({ topic, model, callbacks }: SubmitResearchArgs) => {
       if (!topic.trim()) return;
@@ -140,5 +148,5 @@ export function useResearchStream() {
     status === "researching" ||
     status === "polishing";
 
-  return { status, logEntries, report, errorMessage, isRunning, submit, abort };
+  return { status, logEntries, report, errorMessage, isRunning, submit, abort, clear };
 }

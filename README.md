@@ -9,10 +9,11 @@ AI-powered research briefing app with a decoupled FastAPI backend and Next.js fr
 - **Chat over saved reports or standalone conversations** with Voyage AI embeddings, pgvector retrieval, compressed conversation memory, and Gemini responses.
 - **Persistent conversations** backed by PostgreSQL, including report/message history, vector chunks, and compacted chat summaries.
 - **Email/password authentication** with HTTP-only database-backed session cookies.
+- **Editable account profiles** with usernames, optional display names, MinIO-backed profile photos, and subscription-ready billing fields.
 - **Credentialed security controls** including explicit CORS origins, unsafe-request origin checks, configurable trusted proxies, and endpoint rate limits.
 - **Search failover** from Serper to DuckDuckGo when keys or upstream results are unavailable.
 - **Next.js workspace UI** with authenticated routing, conversation history, settings/account page, responsive sidebars, theme toggle, language switching, and model selection.
-- **Docker Compose** setup for frontend, backend, PostgreSQL, and pgvector.
+- **Docker Compose** setup for frontend, backend, PostgreSQL, pgvector, and MinIO object storage.
 
 ## Architecture
 
@@ -50,7 +51,7 @@ flowchart TD
 │   ├── api/                     # Auth, conversations, research, chat routes and dependencies
 │   ├── agents/                  # CrewAI agent definitions and runner
 │   ├── db/                      # SQLAlchemy models and session setup
-│   ├── services/                # Auth, chat, compaction, RAG, polishing, streaming helpers
+│   ├── services/                # Auth, chat, compaction, object storage, RAG, polishing, streaming helpers
 │   └── tools/                   # Unified search tool with Serper/DuckDuckGo fallback
 ├── frontend/
 │   ├── app/
@@ -67,7 +68,7 @@ flowchart TD
 │   ├── hooks/                   # SSE stream hooks for research and chat
 │   ├── lib/                     # API client, date/time helpers, i18n, shared types
 │   └── public/images/           # Static UI assets such as auth-image.png
-└── docker-compose.yml           # Frontend, backend, and PostgreSQL stack
+└── docker-compose.yml           # Frontend, backend, PostgreSQL, and MinIO stack
 ```
 
 ## Prerequisites
@@ -105,6 +106,13 @@ SESSION_COOKIE_NAME=smart_briefing_session
 SESSION_COOKIE_SECURE=false
 SESSION_COOKIE_SAMESITE=lax
 SESSION_EXPIRE_DAYS=30
+OBJECT_STORAGE_ENDPOINT=http://localhost:9000
+OBJECT_STORAGE_PUBLIC_URL=http://localhost:9000
+OBJECT_STORAGE_BUCKET=profile-photos
+OBJECT_STORAGE_ACCESS_KEY=minioadmin
+OBJECT_STORAGE_SECRET_KEY=minioadmin
+OBJECT_STORAGE_REGION=us-east-1
+PROFILE_UPLOAD_MAX_BYTES=5242880
 ```
 
 Frontend env is optional for local development because the hook defaults to the backend dev URL. Create `frontend/.env.local` if you need a different backend:
@@ -138,6 +146,13 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 | `SESSION_COOKIE_SECURE` | No | `false` | Set `true` for HTTPS deployments. Required when SameSite is `none`. |
 | `SESSION_COOKIE_SAMESITE` | No | `lax` | One of `lax`, `strict`, or `none`. |
 | `SESSION_EXPIRE_DAYS` | No | `30` | Session cookie and database session lifetime. |
+| `OBJECT_STORAGE_ENDPOINT` | No | `http://localhost:9000` | S3-compatible API endpoint used by the backend for MinIO uploads and deletes. |
+| `OBJECT_STORAGE_PUBLIC_URL` | No | `http://localhost:9000` | Public base URL used to build browser-facing profile photo URLs. |
+| `OBJECT_STORAGE_BUCKET` | No | `profile-photos` | Bucket that stores user profile images. |
+| `OBJECT_STORAGE_ACCESS_KEY` | No | `minioadmin` | MinIO or S3 access key. |
+| `OBJECT_STORAGE_SECRET_KEY` | No | `minioadmin` | MinIO or S3 secret key. |
+| `OBJECT_STORAGE_REGION` | No | `us-east-1` | S3-compatible region passed to the backend client. |
+| `PROFILE_UPLOAD_MAX_BYTES` | No | `5242880` | Maximum accepted profile image size in bytes. |
 
 ## Local Development
 
@@ -178,9 +193,16 @@ npm run dev
 
 Open <http://localhost:3000>, create an account, and start a research topic.
 
+To validate the frontend without starting the dev server:
+
+```bash
+npm run lint
+npm run build
+```
+
 ## Docker Compose
 
-From the repository root:
+Create `backend/.env` with the required `GEMINI_API_KEY` and `VOYAGE_API_KEY` values. From the repository root:
 
 ```bash
 docker compose up --build
@@ -191,8 +213,10 @@ Services:
 - Frontend: <http://localhost:3000>
 - Backend: <http://localhost:8000>
 - PostgreSQL: `localhost:5432`
+- MinIO API: <http://localhost:9000>
+- MinIO Console: <http://localhost:9001>
 
-The compose file mounts source directories for hot reload, reads backend secrets from `backend/.env`, starts PostgreSQL with pgvector, and runs `alembic upgrade head` before launching the backend.
+The compose file mounts source directories for hot reload, reads backend secrets from `backend/.env`, starts PostgreSQL with pgvector, provisions a public `profile-photos` bucket in MinIO, and runs `alembic upgrade head` before launching the backend.
 
 ## API
 
@@ -218,6 +242,31 @@ All authenticated browser requests use credentials and an HTTP-only session cook
   - Clears the current database session and cookie.
 - `GET /api/auth/me`
   - Returns the current authenticated user, or `401` when unauthenticated.
+- `PATCH /api/auth/me/profile`
+  - Body: `{ "username": "new_handle", "display_name": "Optional Name" }`
+  - Usernames must be 3-32 characters and contain only letters, numbers, or underscores.
+  - `display_name` may be set to `null` to clear it.
+  - Returns the updated authenticated user.
+  - Rate limit: 20 requests per 300 seconds per client/scope.
+- `POST /api/auth/me/profile-photo`
+  - Multipart form field: `file`
+  - Accepts JPG, PNG, and WebP uploads up to `PROFILE_UPLOAD_MAX_BYTES`.
+  - Stores the object in MinIO and returns the updated authenticated user.
+  - Rate limit: 10 requests per 300 seconds per client/scope.
+- `DELETE /api/auth/me/profile-photo`
+  - Deletes the stored profile image reference and returns the updated authenticated user.
+  - Rate limit: 10 requests per 300 seconds per client/scope.
+
+Returned auth user fields now include:
+
+- `username`
+- `display_name`
+- `profile_image_url`
+- `plan`
+- `subscription_status`
+- `subscription_current_period_end`
+
+Stripe billing is not implemented yet. The database now includes scaffold fields such as `stripe_customer_id` and `stripe_subscription_id` so future subscription work can build on the existing user schema.
 
 ### Conversations
 

@@ -15,7 +15,6 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
-  Settings,
   Sparkles,
   X,
 } from "lucide-react";
@@ -24,8 +23,6 @@ import { useResearchStream } from "@/hooks/useResearchStream";
 import { useChatStream } from "@/hooks/useChatStream";
 import { StatusBar } from "@/components/StatusBar";
 import { AgentLogPanel } from "@/components/AgentLogPanel";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { ConversationComposer } from "@/components/ConversationComposer";
 import { ConversationPanel } from "@/components/ConversationPanel";
 import { ConversationHistorySidebar } from "@/components/ConversationHistorySidebar";
@@ -74,7 +71,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
   const router = useRouter();
   const { t } = useTranslation();
   const { user: currentUser, isLoading: isAuthLoading, logout } = useAuth();
-  const { status, logEntries, errorMessage, isRunning, submit, abort } = useResearchStream();
+  const { status, logEntries, errorMessage, isRunning, submit, abort, clear: clearResearchState } = useResearchStream();
   const { isChatRunning, chatErrorMessage, submitChat, abortChat } = useChatStream();
   const [isInitializing, setIsInitializing] = useState(true);
   const [uiErrorMessage, setUiErrorMessage] = useState<string | null>(null);
@@ -94,6 +91,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
   const workspaceOpenButtonRef = useRef<HTMLButtonElement | null>(null);
   const historyDialogRef = useRef<HTMLDivElement | null>(null);
   const workspaceDialogRef = useRef<HTMLDivElement | null>(null);
+  const conversationLoadIdRef = useRef(0);
 
   const resetConversationState = useCallback(() => {
     setActiveConversationId(null);
@@ -115,8 +113,12 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
 
   const loadConversation = useCallback(
     async (conversationId: string) => {
+      const loadId = conversationLoadIdRef.current + 1;
+      conversationLoadIdRef.current = loadId;
       const conversation = await fetchConversationDetail(conversationId);
-      applyConversation(conversation);
+      if (loadId === conversationLoadIdRef.current) {
+        applyConversation(conversation);
+      }
       return conversation;
     },
     [applyConversation]
@@ -201,6 +203,33 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
     workspaceOpenButtonRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    const dialog = isMobileHistoryOpen
+      ? historyDialogRef.current
+      : isMobileSidebarOpen
+        ? workspaceDialogRef.current
+        : null;
+    if (!dialog) return;
+
+    const focusable = dialog.querySelector<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled])',
+    );
+    focusable?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      if (isMobileHistoryOpen) {
+        closeMobileHistory();
+      } else {
+        closeMobileWorkspace();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [closeMobileHistory, closeMobileWorkspace, isMobileHistoryOpen, isMobileSidebarOpen]);
+
   const isAnyRunning = isRunning || isChatRunning;
   const visibleError = uiErrorMessage ?? errorMessage ?? chatErrorMessage;
   const showWorkspaceShell = Boolean(currentUser && !isInitializing && !isAuthLoading);
@@ -284,6 +313,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
         status: "streaming",
         kind: nextMode,
       };
+      const submissionLoadId = conversationLoadIdRef.current;
 
       if (nextMode === "research") {
         setActiveConversationId(null);
@@ -297,6 +327,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
           model: selectedModel,
           callbacks: {
             onToken: (text) => {
+              if (submissionLoadId !== conversationLoadIdRef.current) return;
               reportDraft += text;
               setMessages((current) =>
                 updateMessage(current, assistantId, (message) => ({
@@ -306,6 +337,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
               );
             },
             onDone: async (conversationId) => {
+              if (submissionLoadId !== conversationLoadIdRef.current) return;
               setLatestReport(reportDraft);
               setMessages((current) =>
                 updateMessage(current, assistantId, (message) => ({
@@ -328,6 +360,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
               }
             },
             onError: (message) => {
+              if (submissionLoadId !== conversationLoadIdRef.current) return;
               setMessages((current) =>
                 updateMessage(current, assistantId, (item) => ({
                   ...item,
@@ -352,6 +385,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
         message: value,
         model: selectedModel,
         onToken: (text) => {
+          if (submissionLoadId !== conversationLoadIdRef.current) return;
           setMessages((current) =>
             updateMessage(current, assistantId, (message) => ({
               ...message,
@@ -360,6 +394,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
           );
         },
         onDone: async (conversationId) => {
+          if (submissionLoadId !== conversationLoadIdRef.current) return;
           setMessages((current) =>
             updateMessage(current, assistantId, (message) => ({
               ...message,
@@ -383,6 +418,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
           }
         },
         onError: (message) => {
+          if (submissionLoadId !== conversationLoadIdRef.current) return;
           setMessages((current) =>
             updateMessage(current, assistantId, (item) => ({
               ...item,
@@ -410,17 +446,21 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
     if (isRunning) abort();
     if (isChatRunning) abortChat();
 
+    conversationLoadIdRef.current += 1;
+    clearResearchState();
     setUiErrorMessage(null);
     resetConversationState();
     closeMobileHistory();
     router.replace("/");
-  }, [abort, abortChat, closeMobileHistory, isChatRunning, isRunning, resetConversationState, router]);
+  }, [abort, abortChat, clearResearchState, closeMobileHistory, isChatRunning, isRunning, resetConversationState, router]);
 
   const handleSelectConversation = useCallback(
     (conversation: ConversationHistoryItem) => {
       if (isRunning) abort();
       if (isChatRunning) abortChat();
 
+      conversationLoadIdRef.current += 1;
+      clearResearchState();
       setUiErrorMessage(null);
       closeMobileHistory();
       router.replace(`/conversations/${conversation.id}`);
@@ -428,7 +468,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
         setUiErrorMessage(error instanceof Error ? error.message : t("errors.backendUnreachable"));
       });
     },
-    [abort, abortChat, closeMobileHistory, isChatRunning, isRunning, loadConversation, router, t]
+    [abort, abortChat, clearResearchState, closeMobileHistory, isChatRunning, isRunning, loadConversation, router, t]
   );
 
   return (
@@ -440,6 +480,13 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
             activeConversationId={activeConversationId}
             onNewConversation={handleNewConversation}
             onSelectConversation={handleSelectConversation}
+            userDisplayName={currentUser?.display_name ?? currentUser?.username}
+            userImageUrl={currentUser?.profile_image_url ?? undefined}
+            onOpenSettings={() => {
+              closeMobileHistory();
+              router.push("/settings");
+            }}
+            onSignOut={() => void handleLogout()}
             className="hidden lg:flex"
           />
         ) : null}
@@ -481,54 +528,23 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
             </div>
             <div className="flex items-center gap-2">
               {showWorkspaceShell ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => router.push("/settings")}
-                    className="hidden h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-xs font-semibold text-muted transition hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10 sm:inline-flex"
-                  >
-                    <Settings className="h-4 w-4" aria-hidden="true" />
-                    <span>{t("settings.title")}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={toggleSidebar}
-                    className="hidden h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-xs font-semibold text-muted transition hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10 lg:inline-flex"
-                    aria-label={
-                      isSidebarCollapsed
-                        ? t("header.expandWorkspace")
-                        : t("header.collapseWorkspace")
-                    }
-                  >
-                    {isSidebarCollapsed ? (
-                      <PanelRightOpen className="h-4 w-4" aria-hidden="true" />
-                    ) : (
-                      <PanelRightClose className="h-4 w-4" aria-hidden="true" />
-                    )}
-                    <span>
-                      {isSidebarCollapsed
-                        ? t("header.openWorkspaceShort")
-                        : t("header.hideWorkspaceShort")}
-                    </span>
-                  </button>
-                </>
+                <button
+                  type="button"
+                  onClick={toggleSidebar}
+                  className="hidden h-10 w-10 items-center justify-center rounded-full border border-line bg-surface text-muted transition hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10 lg:inline-flex"
+                  aria-label={
+                    isSidebarCollapsed
+                      ? t("header.expandWorkspace")
+                      : t("header.collapseWorkspace")
+                  }
+                >
+                  {isSidebarCollapsed ? (
+                    <PanelRightOpen className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <PanelRightClose className="h-4 w-4" aria-hidden="true" />
+                  )}
+                </button>
               ) : null}
-              {currentUser ? (
-                <>
-                  <span className="hidden max-w-52 truncate text-sm text-muted sm:inline-block">
-                    {currentUser.email}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => void handleLogout()}
-                    className="inline-flex h-10 items-center rounded-full border border-line bg-surface px-4 text-xs font-semibold text-muted transition hover:border-rust hover:text-rust focus:outline-none focus:ring-4 focus:ring-rust/10"
-                  >
-                    {t("header.signOut")}
-                  </button>
-                </>
-              ) : null}
-              <LanguageSwitcher />
-              <ThemeToggle />
             </div>
           </header>
 
@@ -622,6 +638,13 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
             activeConversationId={activeConversationId}
             onNewConversation={handleNewConversation}
             onSelectConversation={handleSelectConversation}
+            userDisplayName={currentUser?.display_name ?? currentUser?.username}
+            userImageUrl={currentUser?.profile_image_url ?? undefined}
+            onOpenSettings={() => {
+              closeMobileHistory();
+              router.push("/settings");
+            }}
+            onSignOut={() => void handleLogout()}
             onCloseMobile={closeMobileHistory}
             className="absolute left-0 top-0 h-full w-[min(88vw,320px)]"
           />

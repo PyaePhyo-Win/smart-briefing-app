@@ -15,6 +15,7 @@ type SubmitResearchCallbacks = {
 type SubmitResearchArgs = {
   topic: string;
   model: GeminiModelId;
+  conversationId?: string | null;
   callbacks?: SubmitResearchCallbacks;
 };
 
@@ -48,7 +49,7 @@ export function useResearchStream() {
   }, []);
 
   const submit = useCallback(
-    async ({ topic, model, callbacks }: SubmitResearchArgs) => {
+    async ({ topic, model, conversationId, callbacks }: SubmitResearchArgs) => {
       if (!topic.trim()) return;
       reset();
 
@@ -63,6 +64,7 @@ export function useResearchStream() {
           body: JSON.stringify({
             topic: topic.trim(),
             model,
+            conversation_id: conversationId ?? null,
           }),
           signal: controller.signal,
         });

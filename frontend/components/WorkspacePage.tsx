@@ -316,15 +316,23 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
       const submissionLoadId = conversationLoadIdRef.current;
 
       if (nextMode === "research") {
-        setActiveConversationId(null);
+        const targetConversationId = activeConversationId;
+        const nextMessages = targetConversationId
+          ? [...messages, userMessage, assistantMessage]
+          : [userMessage, assistantMessage];
+
         setLatestReport("");
-        setMessages([userMessage, assistantMessage]);
-        router.replace("/");
+        setMessages(nextMessages);
+        setMode("research");
+        if (!targetConversationId) {
+          router.replace("/");
+        }
         let reportDraft = "";
 
         void submit({
           topic: value,
           model: selectedModel,
+          conversationId: targetConversationId,
           callbacks: {
             onToken: (text) => {
               if (submissionLoadId !== conversationLoadIdRef.current) return;
@@ -345,16 +353,18 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
                   status: "done",
                 }))
               );
-              if (!conversationId) {
+
+              const resolvedConversationId = conversationId ?? targetConversationId;
+              if (!resolvedConversationId) {
                 setUiErrorMessage(t("errors.backendUnreachable"));
                 return;
               }
 
               try {
-                await refreshConversationHistory(conversationId);
-                await loadConversation(conversationId);
+                await refreshConversationHistory(resolvedConversationId);
+                await loadConversation(resolvedConversationId);
                 setMode("chat");
-                router.replace(`/conversations/${conversationId}`);
+                router.replace(`/conversations/${resolvedConversationId}`);
               } catch (error) {
                 setUiErrorMessage(error instanceof Error ? error.message : t("errors.backendUnreachable"));
               }

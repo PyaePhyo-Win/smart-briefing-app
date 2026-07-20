@@ -1,5 +1,6 @@
 import logging
 import queue as q
+import threading
 from datetime import datetime, timezone
 
 from crewai.events.event_bus import crewai_event_bus
@@ -21,9 +22,18 @@ from crewai.events.types.tool_usage_events import (
 )
 
 logger = logging.getLogger(__name__)
+_active_run = threading.local()
 
 
-def register_crew_handlers(event_queue: q.Queue) -> list[tuple]:
+def set_active_run(run_id: str | None) -> None:
+    _active_run.id = run_id
+
+
+def get_active_run() -> str | None:
+    return getattr(_active_run, "id", None)
+
+
+def register_crew_handlers(event_queue: q.Queue, run_id: str) -> list[tuple]:
     """Register CrewAI event bus handlers that push events onto *event_queue*.
 
     Returns a list of (event_type, handler) tuples that must be passed to
@@ -32,6 +42,8 @@ def register_crew_handlers(event_queue: q.Queue) -> list[tuple]:
     handlers: list[tuple] = []
 
     def _push(agent: str, event_name: str, message: str) -> None:
+        if get_active_run() != run_id:
+            return
         body = {
             "type": "log",
             "agent": agent,

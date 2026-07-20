@@ -3,9 +3,11 @@ import json
 import logging
 import queue as q
 from collections.abc import AsyncIterator
-from fastapi import APIRouter, Depends, Request
+from uuid import UUID, uuid4
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from agents.crew_runner import get_executor, run_crew
@@ -24,6 +26,7 @@ router = APIRouter(prefix="/api/research", tags=["research"])
 class ResearchRequest(BaseModel):
     topic: str
     model: str | None = None
+    conversation_id: UUID | None = None
 
     @field_validator("topic")
     @classmethod
@@ -61,11 +64,26 @@ async def research_stream(
 ):
     topic = request.topic
     selected_model = request.model
-    conversation = Conversation(user_id=current_user.id, title=topic[:120])
-    db.add(conversation)
-    db.flush()
+    created_conversation = request.conversation_id is None
 
-    db.add(Message(user_id=current_user.id, conversation_id=conversation.id, role="user", kind="research", content=topic))
+    if request.conversation_id is None:
+        conversation = Conversation(user_id=current_user.id, title=topic[:120])
+        db.add(conversation)
+        db.flush()
+    else:
+        conversation = db.scalar(
+            select(Conversation).where(
+                Conversation.id == request.conversation_id,
+                Conversation.user_id == current_user.id,
+            )
+        )
+        if conversation is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+
+    user_message = Message(user_id=current_user.id, conversation_id=conversation.id, role="user", kind="research", content=topic)
+    db.add(user_message)
+    db.flush()
+    user_message_id = user_message.id
     conversation.updated_at = utc_now()
     db.commit()
     conversation_id = conversation.id
@@ -73,25 +91,34 @@ async def research_stream(
     def cleanup_incomplete_conversation(reason: str) -> None:
         try:
             db.rollback()
-            incomplete_conversation = db.get(Conversation, conversation_id)
-            if incomplete_conversation is not None:
-                db.delete(incomplete_conversation)
+            if created_conversation:
+                incomplete_conversation = db.get(Conversation, conversation_id)
+                if incomplete_conversation is not None:
+                    db.delete(incomplete_conversation)
+                    db.commit()
+                    logger.info("Removed incomplete research conversation %s after %s", conversation_id, reason)
+                return
+
+            incomplete_message = db.get(Message, user_message_id)
+            if incomplete_message is not None:
+                db.delete(incomplete_message)
                 db.commit()
-                logger.info("Removed incomplete research conversation %s after %s", conversation_id, reason)
+                logger.info("Removed incomplete research message %s from conversation %s after %s", user_message_id, conversation_id, reason)
         except Exception:
             db.rollback()
-            logger.exception("Failed to remove incomplete research conversation %s", conversation_id)
+            logger.exception("Failed to clean up incomplete research state for conversation %s", conversation_id)
 
     async def event_stream():
         event_queue: q.Queue = q.Queue()
+        run_id = str(uuid4())
 
         yield _sse("log", agent="System", event="status", message="Starting crew research...")
 
-        handlers = register_crew_handlers(event_queue)
+        handlers = register_crew_handlers(event_queue, run_id)
         loop = asyncio.get_event_loop()
 
         try:
-            crew_future = loop.run_in_executor(get_executor(), run_crew, topic)
+            crew_future = loop.run_in_executor(get_executor(), run_crew, topic, run_id)
 
             while not crew_future.done():
                 if await _request.is_disconnected():

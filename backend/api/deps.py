@@ -1,7 +1,10 @@
 from collections import defaultdict, deque
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
+from importlib import import_module
 from urllib.parse import urlparse
+from uuid import uuid4
 
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from sqlalchemy import select
@@ -14,6 +17,36 @@ from services.auth import hash_session_token
 
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 _RATE_LIMITS: dict[str, deque[datetime]] = defaultdict(deque)
+
+
+@lru_cache(maxsize=1)
+def _get_redis():
+    if not settings.redis_url:
+        return None
+    try:
+        redis_module = import_module("redis")
+        client = redis_module.Redis.from_url(settings.redis_url, decode_responses=True)
+        client.ping()
+        return client
+    except Exception:
+        return None
+
+
+_REDIS_RATE_LIMIT_SCRIPT = """
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local cutoff = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3])
+local member = ARGV[4]
+redis.call('ZREMRANGEBYSCORE', key, '-inf', cutoff)
+local count = redis.call('ZCARD', key)
+if count >= limit then
+  return 0
+end
+redis.call('ZADD', key, now, member)
+redis.call('EXPIRE', key, tonumber(ARGV[5]))
+return 1
+"""
 
 
 def _remote_host(request: Request) -> str:
@@ -70,8 +103,35 @@ def rate_limit(limit: int, window_seconds: int, scope: str) -> Callable[[Request
     def dependency(request: Request) -> None:
         now = datetime.now(timezone.utc)
         cutoff = now - timedelta(seconds=window_seconds)
-        _prune_rate_limit_buckets(cutoff)
         key = f"{scope}:{_client_ip(request)}"
+
+        redis_client = _get_redis()
+        if redis_client is not None:
+            now_ms = int(now.timestamp() * 1000)
+            cutoff_ms = int(cutoff.timestamp() * 1000)
+            try:
+                allowed = redis_client.eval(
+                    _REDIS_RATE_LIMIT_SCRIPT,
+                    1,
+                    f"smart-briefing:rate-limit:{key}",
+                    now_ms,
+                    cutoff_ms,
+                    limit,
+                    f"{now_ms}:{uuid4().hex}",
+                    window_seconds + 1,
+                )
+                if not allowed:
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail="Too many requests. Please try again later.",
+                    )
+                return
+            except HTTPException:
+                raise
+            except Exception:
+                pass
+
+        _prune_rate_limit_buckets(cutoff)
         hits = _RATE_LIMITS[key]
         while hits and hits[0] <= cutoff:
             hits.popleft()

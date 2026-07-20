@@ -44,6 +44,14 @@ services:
       mc anonymous set download local/profile-photos
       "
 
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build:
       context: ./backend
@@ -65,11 +73,14 @@ services:
       OBJECT_STORAGE_SECRET_KEY: minioadmin
       OBJECT_STORAGE_REGION: us-east-1
       PROFILE_UPLOAD_MAX_BYTES: 5242880
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       db:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     command: sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
 
   frontend:

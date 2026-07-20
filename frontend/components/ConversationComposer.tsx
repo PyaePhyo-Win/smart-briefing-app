@@ -100,9 +100,6 @@ export function ConversationComposer({
           })}
 
           <div className="flex flex-1 flex-col gap-1 sm:ml-auto max-w-[175px]">
-            <label id="gemini-model-label" className="px-1 text-xs font-semibold text-muted">
-              {t("composer.modelLabel")}
-            </label>
             <Select
               value={selectedModel}
               onValueChange={(model) => onModelChange(model as GeminiModelId)}

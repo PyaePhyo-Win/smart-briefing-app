@@ -2,6 +2,13 @@
 const nextConfig = {
 	images: {
 		remotePatterns: [
+			...(process.env.NEXT_PUBLIC_PROFILE_IMAGE_HOST
+				? [{
+						protocol: process.env.NEXT_PUBLIC_PROFILE_IMAGE_PROTOCOL ?? "https",
+						hostname: process.env.NEXT_PUBLIC_PROFILE_IMAGE_HOST,
+						pathname: "/**",
+					}]
+				: []),
 			{
 				protocol: "http",
 				hostname: "localhost",

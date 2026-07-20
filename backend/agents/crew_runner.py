@@ -18,7 +18,7 @@ def get_executor() -> ThreadPoolExecutor:
     return _EXECUTOR
 
 
-def run_crew(topic: str) -> str:
+def run_crew(topic: str, run_id: str | None = None) -> str:
     """Run the research crew synchronously. Intended to be called from an executor."""
     logger.info("Starting CrewAI research for topic: %s", topic)
     os.environ.setdefault("CREWAI_TRACING_ENABLED", "false")
@@ -59,7 +59,13 @@ def run_crew(topic: str) -> str:
         tracing=False,
     )
 
-    result = crew.kickoff()
-    output = str(result)
-    logger.info("CrewAI research completed (%d chars)", len(output))
-    return output
+    from services.streaming import set_active_run
+
+    set_active_run(run_id)
+    try:
+        result = crew.kickoff()
+        output = str(result)
+        logger.info("CrewAI research completed (%d chars)", len(output))
+        return output
+    finally:
+        set_active_run(None)

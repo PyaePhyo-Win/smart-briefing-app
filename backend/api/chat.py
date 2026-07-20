@@ -87,20 +87,44 @@ async def chat_stream(
     context_chunks = [chunk.content for chunk in retrieve_relevant_chunks(db, current_user.id, conversation.id, req.message)]
     chat_summary = conversation.chat_summary or ""
 
-    db.add(Message(user_id=current_user.id, conversation_id=conversation.id, role="user", kind="chat", content=req.message))
+    user_message = Message(
+        user_id=current_user.id,
+        conversation_id=conversation.id,
+        role="user",
+        kind="chat",
+        content=req.message,
+    )
+    db.add(user_message)
     conversation.updated_at = utc_now()
     db.commit()
+
+    def cleanup_incomplete_chat() -> None:
+        try:
+            db.rollback()
+            persisted_message = db.get(Message, user_message.id)
+            if persisted_message is not None:
+                db.delete(persisted_message)
+            if req.conversation_id is None:
+                incomplete_conversation = db.get(Conversation, conversation.id)
+                if incomplete_conversation is not None:
+                    db.delete(incomplete_conversation)
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("Failed to clean up incomplete chat state for conversation %s", conversation.id)
 
     async def event_stream():
         assistant_parts: list[str] = []
         try:
             async for text_chunk in stream_chat(req.message, history, context_chunks, chat_summary, model=req.model):
                 if await request.is_disconnected():
+                    cleanup_incomplete_chat()
                     return
                 assistant_parts.append(text_chunk)
                 yield _sse("token", text=text_chunk)
         except Exception as exc:
             logger.exception("Gemini chat failed")
+            cleanup_incomplete_chat()
             yield _sse("error", message="Chat failed. Please try again.")
             return
 
@@ -122,6 +146,7 @@ async def chat_stream(
             except Exception:
                 db.rollback()
                 logger.exception("Failed to persist chat assistant response")
+                cleanup_incomplete_chat()
                 yield _sse("error", message="Chat response could not be saved. Please try again.")
                 return
 

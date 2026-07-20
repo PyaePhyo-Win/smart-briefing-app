@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     trusted_proxy_ips: str = ""
     rate_limit_max_keys: int = 10000
+    redis_url: str = ""
 
     database_url: str = "postgresql+psycopg://smart_briefing:smart_briefing@localhost:5432/smart_briefing"
     voyage_api_key: str = ""

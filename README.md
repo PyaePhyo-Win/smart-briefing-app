@@ -10,10 +10,10 @@ AI-powered research briefing app with a decoupled FastAPI backend and Next.js fr
 - **Persistent conversations** backed by PostgreSQL, including report/message history, vector chunks, and compacted chat summaries.
 - **Email/password authentication** with HTTP-only database-backed session cookies.
 - **Editable account profiles** with usernames, optional display names, MinIO-backed profile photos, and subscription-ready billing fields.
-- **Credentialed security controls** including explicit CORS origins, unsafe-request origin checks, configurable trusted proxies, and endpoint rate limits.
+- **Credentialed security controls** including explicit CORS origins, unsafe-request origin checks, configurable trusted proxies, and endpoint rate limits backed by Redis in Docker Compose or an in-memory fallback locally.
 - **Search failover** from Serper to DuckDuckGo when keys or upstream results are unavailable.
 - **Next.js workspace UI** with authenticated routing, conversation history, settings/account page, responsive sidebars, theme toggle, language switching, and model selection.
-- **Docker Compose** setup for frontend, backend, PostgreSQL, pgvector, and MinIO object storage.
+- **Docker Compose** setup for frontend, backend, PostgreSQL, pgvector, Redis, and MinIO object storage.
 
 ## Architecture
 
@@ -60,7 +60,7 @@ flowchart TD
 │   │   │   ├── login/page.tsx
 │   │   │   └── register/page.tsx
 │   │   ├── conversations/[id]/  # Deep link into a saved conversation
-│   │   └── settings/page.tsx    # Account/settings view
+│   │   └── settings/            # Account, profile, preferences, usage, credits, and billing views
 │   ├── components/              # Workspace, auth, report, history, status, and UI components
 │   │   ├── AuthLayout.tsx       # Split auth shell with hero image and controls
 │   │   ├── AuthPage.tsx         # Login/register form
@@ -68,7 +68,7 @@ flowchart TD
 │   ├── hooks/                   # SSE stream hooks for research and chat
 │   ├── lib/                     # API client, date/time helpers, i18n, shared types
 │   └── public/images/           # Static UI assets such as auth-image.png
-└── docker-compose.yml           # Frontend, backend, PostgreSQL, and MinIO stack
+└── docker-compose.yml           # Frontend, backend, PostgreSQL, Redis, and MinIO stack
 ```
 
 ## Prerequisites
@@ -97,6 +97,7 @@ MAX_CREW_WORKERS=4
 LOG_LEVEL=INFO
 TRUSTED_PROXY_IPS=
 RATE_LIMIT_MAX_KEYS=10000
+REDIS_URL=
 VOYAGE_EMBEDDING_MODEL=voyage-4
 VOYAGE_EMBEDDING_DIMENSION=1024
 RAG_TOP_K=6
@@ -119,6 +120,8 @@ Frontend env is optional for local development because the hook defaults to the 
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_PROFILE_IMAGE_HOST=localhost
+NEXT_PUBLIC_PROFILE_IMAGE_PROTOCOL=http
 ```
 
 ### Backend Environment Variables
@@ -137,6 +140,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 | `LOG_LEVEL` | No | `INFO` | Backend logging level. |
 | `TRUSTED_PROXY_IPS` | No | empty | Comma-separated proxy IPs allowed to supply `X-Forwarded-For` client IPs. |
 | `RATE_LIMIT_MAX_KEYS` | No | `10000` | Maximum in-memory rate-limit buckets; must be at least `1`. |
+| `REDIS_URL` | No | empty | Optional Redis URL for rate limits shared across backend workers and containers. The in-memory limiter is used when unset or unavailable. |
 | `VOYAGE_EMBEDDING_MODEL` | No | `voyage-4` | Embedding model for report chunks. |
 | `VOYAGE_EMBEDDING_DIMENSION` | No | `1024` | Must remain `1024` to match the pgvector schema. |
 | `RAG_TOP_K` | No | `6` | Number of relevant chunks retrieved for chat context. |
@@ -213,10 +217,11 @@ Services:
 - Frontend: <http://localhost:3000>
 - Backend: <http://localhost:8000>
 - PostgreSQL: `localhost:5432`
+- Redis: internal Docker network only (`redis://redis:6379/0` for the backend)
 - MinIO API: <http://localhost:9000>
 - MinIO Console: <http://localhost:9001>
 
-The compose file mounts source directories for hot reload, reads backend secrets from `backend/.env`, starts PostgreSQL with pgvector, provisions a public `profile-photos` bucket in MinIO, and runs `alembic upgrade head` before launching the backend.
+The compose file mounts source directories for hot reload, reads backend secrets from `backend/.env`, starts PostgreSQL with pgvector, starts Redis for shared rate limits, provisions a public `profile-photos` bucket in MinIO, and runs `alembic upgrade head` before launching the backend.
 
 ## API
 
@@ -281,14 +286,17 @@ Stripe billing is not implemented yet. The database now includes scaffold fields
 Body:
 
 ```json
-{ "topic": "AI adoption in healthcare", "model": "gemini-3.5-flash" }
+{ "topic": "AI adoption in healthcare", "model": "gemini-3.5-flash", "conversation_id": null }
 ```
 
 `model` is optional and controls report polishing only. If omitted, the backend uses `POLISH_MODEL`. Supported values are `gemini-3.5-flash`, `gemini-3.1-flash-lite`, `gemini-2.5-flash`, and `gemini-2.5-flash-lite`.
 
+`conversation_id` is optional. When omitted or `null`, the backend creates a new research conversation titled from the topic. When provided, it appends the research request to an existing conversation owned by the authenticated user.
+
 Validation and limits:
 
 - Requires authentication.
+- Provided `conversation_id` values require ownership of the conversation.
 - `topic` is trimmed and must be 3-300 characters.
 - Rate limit: 3 requests per 300 seconds per client/scope.
 
@@ -340,7 +348,9 @@ Response: `text/event-stream` with:
 - The composer supports model selection for research polish and chat responses.
 - The conversation sidebar is collapsible/resizable on desktop and opens as an accessible mobile panel on small screens.
 - The workspace header exposes language switching, theme toggling, settings, and logout.
-- `/settings` verifies the session and displays account details for the current user.
+- `/settings` verifies the session and links to account subpages for profile, preferences, usage, credits, and billing.
+- `/settings/profile` supports username/display name edits and profile photo upload/removal.
+- `/settings/preferences` exposes language and theme controls. Usage, credits, and billing pages are placeholders marked coming soon.
 
 ## Notes
 
@@ -349,6 +359,5 @@ Response: `text/event-stream` with:
 - Do not use `ALLOWED_ORIGINS=*`; credentialed CORS and CSRF origin validation require explicit origins.
 - If deploying cross-site cookies with `SESSION_COOKIE_SAMESITE=none`, set `SESSION_COOKIE_SECURE=true` and serve over HTTPS.
 - Add real secrets only to local environment files or deployment secret stores. Do not commit `.env` files.
-- Docker Compose reads backend secrets from `backend/.env` and runs `alembic upgrade head` before starting Uvicorn.
-- The frontend uses `NEXT_PUBLIC_API_URL` to call the backend; Docker Compose sets it to `http://localhost:8000`.
-- PostgreSQL data persists in the `postgres_data` Docker volume.
+- Docker Compose reads backend secrets from `backend/.env`, uses Redis for shared rate limits, and runs `alembic upgrade head` before starting Uvicorn.
+- PostgreSQL and MinIO data persist in Docker volumes.

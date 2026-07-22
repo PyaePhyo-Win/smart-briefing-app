@@ -16,6 +16,7 @@ from db.session import get_db
 from services.chat import MAX_HISTORY_MESSAGES, stream_chat
 from services.compaction import compact_older_messages_in_background
 from services.rag import retrieve_relevant_chunks
+from services.usage_limits import CHAT_KIND, reserve_usage
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -71,6 +72,8 @@ async def chat_stream(
         if conversation is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
 
+    usage_event = reserve_usage(db, current_user, CHAT_KIND, conversation.id)
+
     previous_messages = list(
         db.scalars(
             select(Message)
@@ -104,6 +107,9 @@ async def chat_stream(
             persisted_message = db.get(Message, user_message.id)
             if persisted_message is not None:
                 db.delete(persisted_message)
+            persisted_usage = db.get(type(usage_event), usage_event.id)
+            if persisted_usage is not None:
+                db.delete(persisted_usage)
             if req.conversation_id is None:
                 incomplete_conversation = db.get(Conversation, conversation.id)
                 if incomplete_conversation is not None:

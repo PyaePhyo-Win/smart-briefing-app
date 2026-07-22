@@ -9,7 +9,8 @@ AI-powered research briefing app with a decoupled FastAPI backend and Next.js fr
 - **Chat over saved reports or standalone conversations** with Voyage AI embeddings, pgvector retrieval, compressed conversation memory, and Gemini responses.
 - **Persistent conversations** backed by PostgreSQL, including report/message history, vector chunks, and compacted chat summaries.
 - **Email/password authentication** with HTTP-only database-backed session cookies.
-- **Editable account profiles** with usernames, optional display names, MinIO-backed profile photos, and subscription-ready billing fields.
+- **Editable account profiles** with usernames, optional display names, MinIO-backed profile photos, and Stripe Test Mode subscriptions.
+- **Plan usage limits** with persistent rolling-window accounting, stream reservation cleanup, and Pro subscription management.
 - **Credentialed security controls** including explicit CORS origins, unsafe-request origin checks, configurable trusted proxies, and endpoint rate limits backed by Redis in Docker Compose or an in-memory fallback locally.
 - **Search failover** from Serper to DuckDuckGo when keys or upstream results are unavailable.
 - **Next.js workspace UI** with authenticated routing, conversation history, settings/account page, responsive sidebars, theme toggle, language switching, and model selection.
@@ -51,7 +52,7 @@ flowchart TD
 │   ├── api/                     # Auth, conversations, research, chat routes and dependencies
 │   ├── agents/                  # CrewAI agent definitions and runner
 │   ├── db/                      # SQLAlchemy models and session setup
-│   ├── services/                # Auth, chat, compaction, object storage, RAG, polishing, streaming helpers
+│   ├── services/                # Auth, chat, compaction, object storage, RAG, polishing, streaming, and usage helpers
 │   └── tools/                   # Unified search tool with Serper/DuckDuckGo fallback
 ├── frontend/
 │   ├── app/
@@ -114,6 +115,11 @@ OBJECT_STORAGE_ACCESS_KEY=minioadmin
 OBJECT_STORAGE_SECRET_KEY=minioadmin
 OBJECT_STORAGE_REGION=us-east-1
 PROFILE_UPLOAD_MAX_BYTES=5242880
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+STRIPE_PRO_PRICE_ID=price_your_pro_monthly_price
+BILLING_SUCCESS_URL=http://localhost:3000/settings/billing?checkout=success
+BILLING_CANCEL_URL=http://localhost:3000/settings/billing?checkout=cancelled
 ```
 
 Frontend env is optional for local development because the hook defaults to the backend dev URL. Create `frontend/.env.local` if you need a different backend:
@@ -157,6 +163,11 @@ NEXT_PUBLIC_PROFILE_IMAGE_PROTOCOL=http
 | `OBJECT_STORAGE_SECRET_KEY` | No | `minioadmin` | MinIO or S3 secret key. |
 | `OBJECT_STORAGE_REGION` | No | `us-east-1` | S3-compatible region passed to the backend client. |
 | `PROFILE_UPLOAD_MAX_BYTES` | No | `5242880` | Maximum accepted profile image size in bytes. |
+| `STRIPE_SECRET_KEY` | No | empty | Stripe Test Mode secret key. Required for billing endpoints. |
+| `STRIPE_WEBHOOK_SECRET` | No | empty | Signing secret for the Stripe webhook endpoint. |
+| `STRIPE_PRO_PRICE_ID` | No | empty | Stripe recurring Price ID for the Pro plan. Required to create checkout sessions. |
+| `BILLING_SUCCESS_URL` | No | `http://localhost:3000/settings/billing?checkout=success` | Browser return URL after successful Checkout. |
+| `BILLING_CANCEL_URL` | No | `http://localhost:3000/settings/billing?checkout=cancelled` | Browser return URL when Checkout is cancelled. |
 
 ## Local Development
 
@@ -271,7 +282,31 @@ Returned auth user fields now include:
 - `subscription_status`
 - `subscription_current_period_end`
 
-Stripe billing is not implemented yet. The database now includes scaffold fields such as `stripe_customer_id` and `stripe_subscription_id` so future subscription work can build on the existing user schema.
+### Billing and usage
+
+Stripe billing uses Test Mode Checkout and subscription webhooks. Create a recurring Pro Price in the Stripe Dashboard, set its ID as `STRIPE_PRO_PRICE_ID`, and configure a webhook destination for `POST /api/billing/webhook` with these events:
+
+- `checkout.session.completed`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `customer.deleted`
+
+For local webhook testing, install the Stripe CLI and run:
+
+```bash
+stripe listen --forward-to localhost:8000/api/billing/webhook
+```
+
+Copy the printed `whsec_...` value into `STRIPE_WEBHOOK_SECRET`. The billing settings page uses these endpoints:
+
+- `GET /api/billing/status`
+- `POST /api/billing/checkout`
+- `POST /api/billing/cancel`
+- `POST /api/billing/resume`
+- `POST /api/billing/webhook`
+
+Free users have a shared rolling 24-hour allowance of 10 units: chat uses 1 unit per message and research uses 5 units per run, equivalent to 10 chat messages or 2 research runs when used alone. Pro users have separate rolling 5-hour limits of 100 chat messages and 10 research runs. Usage is reserved before streaming and released when a stream fails or does not complete.
 
 ### Conversations
 
@@ -350,7 +385,9 @@ Response: `text/event-stream` with:
 - The workspace header exposes language switching, theme toggling, settings, and logout.
 - `/settings` verifies the session and links to account subpages for profile, preferences, usage, credits, and billing.
 - `/settings/profile` supports username/display name edits and profile photo upload/removal.
-- `/settings/preferences` exposes language and theme controls. Usage, credits, and billing pages are placeholders marked coming soon.
+- `/settings/preferences` exposes language and theme controls.
+- `/settings/billing` fetches live billing status, shows the current plan/subscription state and rolling usage windows, starts Stripe Checkout for Pro upgrades, and can cancel or resume an active subscription.
+- `/settings/usage` and `/settings/credits` are still placeholder pages marked coming soon.
 
 ## Notes
 

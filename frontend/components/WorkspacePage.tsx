@@ -492,6 +492,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
             onSelectConversation={handleSelectConversation}
             userDisplayName={currentUser?.display_name ?? currentUser?.username}
             userImageUrl={currentUser?.profile_image_url ?? undefined}
+            userPlan={currentUser?.plan}
             onOpenSettings={() => {
               closeMobileHistory();
               router.push("/settings");
@@ -650,6 +651,7 @@ export function WorkspacePage({ initialConversationId }: WorkspacePageProps) {
             onSelectConversation={handleSelectConversation}
             userDisplayName={currentUser?.display_name ?? currentUser?.username}
             userImageUrl={currentUser?.profile_image_url ?? undefined}
+            userPlan={currentUser?.plan}
             onOpenSettings={() => {
               closeMobileHistory();
               router.push("/settings");

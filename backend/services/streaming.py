@@ -1,6 +1,6 @@
 import logging
 import queue as q
-import threading
+from contextvars import ContextVar
 from datetime import datetime, timezone
 
 from crewai.events.event_bus import crewai_event_bus
@@ -22,15 +22,15 @@ from crewai.events.types.tool_usage_events import (
 )
 
 logger = logging.getLogger(__name__)
-_active_run = threading.local()
+_active_run: ContextVar[str | None] = ContextVar("active_crew_run", default=None)
 
 
 def set_active_run(run_id: str | None) -> None:
-    _active_run.id = run_id
+    _active_run.set(run_id)
 
 
 def get_active_run() -> str | None:
-    return getattr(_active_run, "id", None)
+    return _active_run.get()
 
 
 def register_crew_handlers(event_queue: q.Queue, run_id: str) -> list[tuple]:

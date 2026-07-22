@@ -1,5 +1,8 @@
 import type {
   AuthUser,
+  BillingActionResponse,
+  BillingStatus,
+  CheckoutResponse,
   ConversationHistoryItem,
   ConversationMessage,
   ConversationMessageKind,
@@ -212,4 +215,32 @@ export async function deleteConversation(conversationId: string): Promise<void> 
   await apiRequest(`/api/conversations/${conversationId}`, {
     method: "DELETE",
   });
+}
+
+export async function fetchBillingStatus(): Promise<BillingStatus> {
+  const response = await apiRequest<BillingStatus>("/api/billing/status", {
+    method: "GET",
+  });
+  return response as BillingStatus;
+}
+
+export async function createBillingCheckoutSession(): Promise<CheckoutResponse> {
+  const response = await apiRequest<CheckoutResponse>("/api/billing/checkout", {
+    method: "POST",
+  });
+  return response as CheckoutResponse;
+}
+
+export async function cancelBillingSubscription(): Promise<BillingActionResponse> {
+  const response = await apiRequest<BillingActionResponse>("/api/billing/cancel", {
+    method: "POST",
+  });
+  return response as BillingActionResponse;
+}
+
+export async function resumeBillingSubscription(): Promise<BillingActionResponse> {
+  const response = await apiRequest<BillingActionResponse>("/api/billing/resume", {
+    method: "POST",
+  });
+  return response as BillingActionResponse;
 }

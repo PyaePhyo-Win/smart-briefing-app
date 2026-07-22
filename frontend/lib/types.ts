@@ -73,6 +73,59 @@ export type AuthUser = {
   subscription_current_period_end: string | null;
 };
 
+export type UsageWindow = {
+  name: string;
+  kind: "shared" | "chat" | "research" | string;
+  window_seconds: number;
+  window_start: string;
+  window_end: string;
+  limit: number;
+  used: number;
+  remaining: number;
+};
+
+export type UsageRules = {
+  free: {
+    window_seconds: number;
+    shared_unit_limit: number;
+    chat_units: number;
+    research_units: number;
+  };
+  pro: {
+    window_seconds: number;
+    chat_limit: number;
+    research_limit: number;
+  };
+};
+
+export type UsageStatus = {
+  plan: string;
+  subscription_status: string;
+  is_pro: boolean;
+  subscription_current_period_end: string | null;
+  windows: UsageWindow[];
+  rules: UsageRules;
+};
+
+export type BillingStatus = {
+  plan: string;
+  subscription_status: string;
+  is_pro: boolean;
+  subscription_current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  usage: UsageStatus;
+};
+
+export type CheckoutResponse = {
+  url: string;
+};
+
+export type BillingActionResponse = {
+  ok: boolean;
+};
+
 export type LogEntry = {
   id: number;
   message: string;

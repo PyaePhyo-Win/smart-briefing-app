@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     object_storage_region: str = "us-east-1"
     profile_upload_max_bytes: int = 5 * 1024 * 1024
 
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_pro_price_id: str = ""
+    billing_success_url: str = "http://localhost:3000/settings/billing?checkout=success"
+    billing_cancel_url: str = "http://localhost:3000/settings/billing?checkout=cancelled"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @property

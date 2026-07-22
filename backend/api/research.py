@@ -18,6 +18,7 @@ from db.session import get_db
 from services.polish import stream_polish
 from services.rag import index_report_chunks
 from services.streaming import register_crew_handlers, unregister_handlers
+from services.usage_limits import RESEARCH_KIND, reserve_usage
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/research", tags=["research"])
@@ -80,6 +81,8 @@ async def research_stream(
         if conversation is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
 
+    usage_event = reserve_usage(db, current_user, RESEARCH_KIND, conversation.id)
+
     user_message = Message(user_id=current_user.id, conversation_id=conversation.id, role="user", kind="research", content=topic)
     db.add(user_message)
     db.flush()
@@ -98,6 +101,10 @@ async def research_stream(
                     db.commit()
                     logger.info("Removed incomplete research conversation %s after %s", conversation_id, reason)
                 return
+
+            persisted_usage = db.get(type(usage_event), usage_event.id)
+            if persisted_usage is not None:
+                db.delete(persisted_usage)
 
             incomplete_message = db.get(Message, user_message_id)
             if incomplete_message is not None:

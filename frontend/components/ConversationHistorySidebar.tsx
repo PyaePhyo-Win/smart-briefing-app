@@ -15,6 +15,7 @@ type ConversationHistorySidebarProps = {
   onSelectConversation: (conversation: ConversationHistoryItem) => void;
   userDisplayName?: string;
   userImageUrl?: string;
+  userPlan?: string;
   onOpenSettings?: () => void;
   onSignOut?: () => void;
   onCloseMobile?: () => void;
@@ -31,6 +32,7 @@ export function ConversationHistorySidebar({
   onSelectConversation,
   userDisplayName,
   userImageUrl,
+  userPlan,
   onOpenSettings,
   onSignOut,
   onCloseMobile,
@@ -38,6 +40,8 @@ export function ConversationHistorySidebar({
 }: ConversationHistorySidebarProps) {
   const { t } = useTranslation();
   const identityLabel = userDisplayName || t("settings.unavailable");
+  const isProPlan = userPlan?.toLowerCase() === "pro";
+  const planLabel = isProPlan ? t("settings.planPro") : t("settings.planFree");
 
   return (
     <aside
@@ -161,8 +165,18 @@ export function ConversationHistorySidebar({
                   <UserCircle className="h-5 w-5" aria-hidden="true" />
                 </span>
               )}
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold text-ink">{identityLabel}</span>
+              <span className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="block min-w-0 truncate font-semibold text-ink">{identityLabel}</span>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em]",
+                    isProPlan
+                      ? "border-rust/30 bg-rust/10 text-rust"
+                      : "border-line bg-surface text-muted",
+                  )}
+                >
+                  {planLabel}
+                </span>
               </span>
             </div>
           ) : null}
